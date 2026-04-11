@@ -1,0 +1,44 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+build/
+dist/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Package metadata
+pip-wheel-metadata/
+
+# IDE / editor
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Pytest
+.pytest_cache/
+.cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Snapshot tests (regenerated on test run)
+tests/__snapshots__/*.html
+
+# Application data (generated at runtime, user-specific)
+# Note: real app data lives in ~/.local/share/ai-dashboard, not in repo.
+# These patterns are belt-and-suspenders in case a dev symlinks data back.
+cache.db
+cache.db-wal
+cache.db-shm
+
+# Smoke test temp files
+/tmp/ai_dashboard_smoke.db*
