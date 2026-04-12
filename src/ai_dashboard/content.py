@@ -5,6 +5,7 @@ import asyncio
 import httpx
 from selectolax.parser import HTMLParser
 
+from ai_dashboard import USER_AGENT
 from ai_dashboard.source_catalog import CATALOG_BY_KIND
 from ai_dashboard.storage.db import Database
 from ai_dashboard.storage.models import FeedItem
@@ -22,7 +23,7 @@ class ContentFetcher:
         self._http = httpx.AsyncClient(
             timeout=httpx.Timeout(connect=5.0, read=30.0, write=5.0, pool=5.0),
             limits=httpx.Limits(max_connections=5, max_keepalive_connections=3),
-            headers={"User-Agent": "ai-dashboard/0.1"},
+            headers={"User-Agent": USER_AGENT},
             follow_redirects=True,
         )
 

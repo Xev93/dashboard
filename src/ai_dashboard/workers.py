@@ -6,7 +6,8 @@ from typing import Any, Awaitable, Callable
 
 import httpx
 
-from ai_dashboard.sources.base import SourceError, SourceRateLimited
+from ai_dashboard import USER_AGENT
+from ai_dashboard.sources.base import SourceAdapter, SourceRateLimited
 from ai_dashboard.storage.db import Database
 
 
@@ -23,7 +24,7 @@ class PollingOrchestrator:
         self.adapter_specs = adapter_specs
         self.db = db
         self.on_new_items = on_new_items
-        self._adapters: list[Any] = []
+        self._adapters: list[SourceAdapter] = []
         self._tasks: list[asyncio.Task[Any]] = []
         self._wake_events: dict[str, asyncio.Event] = {}
         self._http: httpx.AsyncClient | None = None
@@ -34,7 +35,7 @@ class PollingOrchestrator:
         self._http = httpx.AsyncClient(
             timeout=httpx.Timeout(connect=5.0, read=10.0, write=5.0, pool=5.0),
             limits=httpx.Limits(max_connections=20, max_keepalive_connections=10),
-            headers={"User-Agent": "ai-dashboard/0.1"},
+            headers={"User-Agent": USER_AGENT},
             follow_redirects=True,
         )
 
