@@ -56,7 +56,6 @@ class FeedListWidget(DataTable[str]):
         self.add_column("S", key="source")
         self.add_column("Title", key="title")
         self.add_column("Age", key="age")
-        self.run_worker(self.refresh_items(), exclusive=True)
 
     async def refresh_items(self) -> None:
         now = datetime.now(timezone.utc)
