@@ -5,21 +5,10 @@ from typing import Any
 
 import httpx
 
+from ai_dashboard.source_catalog import SOURCE_CATALOG
+
 _ADAPTER_SPECS: dict[str, tuple[str, str]] = {
-    "arxiv": ("ai_dashboard.sources.arxiv", "ArxivAdapter"),
-    "hn": ("ai_dashboard.sources.hackernews", "HackerNewsAdapter"),
-    "github_trending": (
-        "ai_dashboard.sources.github_trending",
-        "GithubTrendingAdapter",
-    ),
-    "huggingface": ("ai_dashboard.sources.huggingface", "HuggingFaceAdapter"),
-    "lab_blog": ("ai_dashboard.sources.lab_blog", "LabBlogAdapter"),
-    "newsletter": ("ai_dashboard.sources.newsletter", "NewsletterAdapter"),
-    "papers_with_code": (
-        "ai_dashboard.sources.papers_with_code",
-        "PapersWithCodeAdapter",
-    ),
-    "reddit": ("ai_dashboard.sources.reddit", "RedditAdapter"),
+    source.kind: (source.module, source.class_name) for source in SOURCE_CATALOG
 }
 
 

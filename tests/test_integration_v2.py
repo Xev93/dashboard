@@ -41,13 +41,12 @@ kind = "newsletter"
 
     config = AppConfig.load(config_path)
 
-    assert [source.kind for source in config.sources] == [
-        "arxiv",
-        "hn",
-        "github_trending",
-        "huggingface",
-        "newsletter",
-    ]
+    kinds = [source.kind for source in config.sources]
+    assert kinds[:5] == ["arxiv", "hn", "github_trending", "huggingface", "newsletter"]
+    assert "dblp" in kinds
+    assert "hal" in kinds
+    assert "lab_blog" in kinds
+    assert len(kinds) >= 5
     assert config.ranking == RankingConfig()
     assert config.db_path == Path("cache-v1.db")
 
@@ -97,7 +96,8 @@ top_search_terms = 5
 
     config = AppConfig.load(config_path)
 
-    assert [source.kind for source in config.sources] == [
+    kinds = [source.kind for source in config.sources]
+    assert kinds[:8] == [
         "arxiv",
         "hn",
         "github_trending",
@@ -107,6 +107,8 @@ top_search_terms = 5
         "reddit",
         "papers_with_code",
     ]
+    assert "dblp" in kinds
+    assert "hal" in kinds
     assert config.ranking == RankingConfig(
         source_weight_first_party=0.7,
         source_weight_community=0.15,

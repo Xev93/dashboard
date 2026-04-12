@@ -6,6 +6,8 @@ from textual.message import Message
 from textual.reactive import reactive
 from textual.widgets import Static
 
+from ai_dashboard.source_catalog import TAB_ENTRIES
+
 
 class SourceTabs(Static):
     class TabChanged(Message):
@@ -13,17 +15,7 @@ class SourceTabs(Static):
             super().__init__()
             self.source_kind = source_kind
 
-    TABS = [
-        ("All", None),
-        ("AX", "arxiv"),
-        ("HN", "hn"),
-        ("GH", "github_trending"),
-        ("HF", "huggingface"),
-        ("NL", "newsletter"),
-        ("RD", "reddit"),
-        ("LB", "lab_blog"),
-        ("PW", "papers_with_code"),
-    ]
+    TABS = list(TAB_ENTRIES)
 
     active_index: reactive[int] = reactive(0)
 

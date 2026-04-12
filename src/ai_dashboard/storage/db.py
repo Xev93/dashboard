@@ -7,16 +7,11 @@ from typing import Any
 
 import aiosqlite
 
+from ai_dashboard.source_catalog import ENGAGEMENT_KEYS as _ENGAGEMENT_KEYS
 from ai_dashboard.storage.models import FeedItem, _parse_iso
 
 
 SCHEMA_VERSION = 2
-_ENGAGEMENT_KEYS: dict[str, str] = {
-    "hn": "points",
-    "github_trending": "stars",
-    "reddit": "score",
-    "huggingface": "likes",
-}
 MIN_SAMPLE_SIZE = 20
 
 

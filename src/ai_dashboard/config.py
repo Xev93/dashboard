@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import os
-from importlib import import_module
 from dataclasses import dataclass, field
+from importlib import import_module
 from pathlib import Path
 from typing import Any
+
+from ai_dashboard.source_catalog import CATALOG_BY_KIND, SOURCE_CATALOG
 
 try:
     tomllib = import_module("tomllib")
@@ -12,31 +14,8 @@ except ModuleNotFoundError:
     tomllib = import_module("tomli")
 
 
-DEFAULT_HN_KEYWORDS = [
-    "AI",
-    "ML",
-    "LLM",
-    "GPT",
-    "Claude",
-    "OpenAI",
-    "Anthropic",
-    "neural",
-    "transformer",
-    "diffusion",
-    "agent",
-    "LoRA",
-    "fine-tun",
-    "embedding",
-    "RAG",
-    "deep learning",
-    "prompt",
-]
-
-DEFAULT_NEWSLETTER_FEEDS = [
-    "https://jack-clark.net/feed/",
-    "https://www.deeplearning.ai/the-batch/feed/",
-    "https://tldr.tech/api/rss/ai",
-]
+DEFAULT_HN_KEYWORDS = list(CATALOG_BY_KIND["hn"].default_options["keywords"])
+DEFAULT_NEWSLETTER_FEEDS = list(CATALOG_BY_KIND["newsletter"].default_options["feeds"])
 
 
 @dataclass
@@ -69,21 +48,12 @@ class AppConfig:
     def defaults(cls) -> "AppConfig":
         return cls(
             sources=[
-                SourceConfig(kind="arxiv"),
-                SourceConfig(kind="hn", options={"keywords": DEFAULT_HN_KEYWORDS}),
-                SourceConfig(kind="github_trending"),
-                SourceConfig(kind="huggingface"),
-                SourceConfig(kind="lab_blog"),
-                SourceConfig(kind="papers_with_code"),
                 SourceConfig(
-                    kind="newsletter", options={"feeds": DEFAULT_NEWSLETTER_FEEDS}
-                ),
-                SourceConfig(
-                    kind="reddit",
-                    options={
-                        "subreddits": ["MachineLearning", "artificial", "LocalLLaMA"]
-                    },
-                ),
+                    kind=source.kind,
+                    enabled=source.enabled,
+                    options=dict(source.default_options),
+                )
+                for source in SOURCE_CATALOG
             ],
             db_path=_default_db_path(),
         )
@@ -108,6 +78,17 @@ class AppConfig:
             )
         if not sources:
             sources = cls.defaults().sources
+        else:
+            configured_kinds = {s.kind for s in sources}
+            for source in SOURCE_CATALOG:
+                if source.kind not in configured_kinds:
+                    sources.append(
+                        SourceConfig(
+                            kind=source.kind,
+                            enabled=source.enabled,
+                            options=dict(source.default_options),
+                        )
+                    )
         db_path = Path(data.get("db_path", _default_db_path()))
         log_level = data.get("log_level", "INFO")
         ranking_raw = data.get("ranking", {})

@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import math
 from datetime import datetime
-from typing import Protocol, cast
+from typing import AbstractSet, Protocol, cast
 
 from ai_dashboard.config import RankingConfig
+from ai_dashboard.source_catalog import ENGAGEMENT_KEYS, FIRST_PARTY_KINDS
 from ai_dashboard.storage.db import Database
 from ai_dashboard.storage.models import FeedItem
 
@@ -20,7 +21,7 @@ class _SupportsHeuristicQueries(Protocol):
 class HeuristicRankingStrategy:
     """Rank items by heuristic score: engagement + source_weight + keyword_boost + recency_decay - skip_penalty."""
 
-    FIRST_PARTY: set[str] = {"arxiv", "lab_blog"}
+    FIRST_PARTY: AbstractSet[str] = FIRST_PARTY_KINDS
     name: str = "heuristic-ranking"
     _config: RankingConfig
     _limit: int
@@ -69,13 +70,7 @@ class HeuristicRankingStrategy:
     def _engagement_normalized(
         self, item: FeedItem, percentiles: dict[str, float]
     ) -> float:
-        metric_keys = {
-            "hn": "points",
-            "github_trending": "stars",
-            "reddit": "score",
-            "huggingface": "likes",
-        }
-        key = metric_keys.get(item.source_kind)
+        key = ENGAGEMENT_KEYS.get(item.source_kind)
         if key is None:
             return 0.0
         raw_value = item.raw_payload.get(key, 0)

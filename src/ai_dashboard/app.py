@@ -46,7 +46,7 @@ class AIDashboardApp(App[None]):
         ("r", "refresh_all", "Refresh"),
         ("o", "open_url", "Open URL"),
         ("space", "toggle_seen", "Toggle seen"),
-        *[Binding(str(i), f"select_tab({i})", show=False) for i in range(1, 10)],
+        *[Binding(str(i), f"select_tab({i})", show=False) for i in range(1, 14)],
         Binding("tab", "next_tab", "Next tab", priority=True),
         Binding("shift+tab", "prev_tab", "Prev tab", priority=True, show=False),
         Binding("pageup", "scroll_reading_up", "Page Up", priority=True),

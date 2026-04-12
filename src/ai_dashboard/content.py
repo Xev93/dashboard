@@ -1,12 +1,11 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timezone
-from typing import Any
 
 import httpx
 from selectolax.parser import HTMLParser
 
+from ai_dashboard.source_catalog import CATALOG_BY_KIND
 from ai_dashboard.storage.db import Database
 from ai_dashboard.storage.models import FeedItem
 
@@ -49,27 +48,44 @@ class ContentFetcher:
         return content or "[No content available]"
 
     async def _fetch_by_kind(self, item: FeedItem) -> str:
-        kind = item.source_kind
-        if kind == "arxiv":
+        source_def = CATALOG_BY_KIND.get(item.source_kind)
+        if source_def is None:
+            return ""
+
+        mode = source_def.content_mode
+        if mode == "arxiv":
             return await self._fetch_arxiv(item)
-        elif kind == "github_trending":
+        elif mode == "github_readme":
             return await self._fetch_github_readme(item)
-        elif kind == "huggingface":
+        elif mode == "hf_card":
             return await self._fetch_hf_card(item)
-        elif kind == "hn":
+        elif mode == "web_article":
             return await self._fetch_web_article(item.url)
-        elif kind == "newsletter":
-            return await self._fetch_web_article(item.url)
+        elif mode.startswith("payload:"):
+            return self._fetch_from_payload(item, mode.split(":", 1)[1])
         return ""
 
+    @staticmethod
+    def _fetch_from_payload(item: FeedItem, key: str) -> str:
+        text = item.raw_payload.get(key, "")
+        if not text:
+            return ""
+        if isinstance(text, str):
+            return text
+        return str(text)
+
     async def _fetch_arxiv(self, item: FeedItem) -> str:
+        http = self._http
+        if http is None:
+            return item.raw_payload.get("abstract", "")
+
         arxiv_id = item.raw_payload.get("arxiv_id", "")
         if not arxiv_id:
             return item.raw_payload.get("abstract", "")
 
         html_url = f"https://arxiv.org/html/{arxiv_id}"
         try:
-            resp = await self._http.get(html_url)
+            resp = await http.get(html_url)
             if resp.status_code == 200:
                 tree = HTMLParser(resp.text)
                 for tag in tree.css(
@@ -88,6 +104,10 @@ class ContentFetcher:
         return item.raw_payload.get("abstract", "[No abstract available]")
 
     async def _fetch_github_readme(self, item: FeedItem) -> str:
+        http = self._http
+        if http is None:
+            return item.raw_payload.get("description", "")
+
         owner = item.raw_payload.get("owner", "")
         name = item.raw_payload.get("name", "")
         if not owner or not name:
@@ -96,7 +116,7 @@ class ContentFetcher:
         for branch in ("main", "master"):
             url = f"https://raw.githubusercontent.com/{owner}/{name}/{branch}/README.md"
             try:
-                resp = await self._http.get(url)
+                resp = await http.get(url)
                 if resp.status_code == 200:
                     text = resp.text
                     if len(text) > 15000:
@@ -108,6 +128,10 @@ class ContentFetcher:
         return item.raw_payload.get("description", "[README not found]")
 
     async def _fetch_hf_card(self, item: FeedItem) -> str:
+        http = self._http
+        if http is None:
+            return ""
+
         hf_kind = item.raw_payload.get("hf_kind", "model")
         hf_id = item.raw_payload.get("id", "")
         if not hf_id:
@@ -118,7 +142,7 @@ class ContentFetcher:
         )
         readme_url = f"https://huggingface.co/{hf_id}/resolve/main/README.md"
         try:
-            resp = await self._http.get(readme_url)
+            resp = await http.get(readme_url)
             if resp.status_code == 200:
                 text = resp.text
                 if len(text) > 15000:
@@ -129,7 +153,7 @@ class ContentFetcher:
 
         url = f"https://huggingface.co/api/{kind_plural}/{hf_id}"
         try:
-            resp = await self._http.get(url, headers={"Accept": "application/json"})
+            resp = await http.get(url, headers={"Accept": "application/json"})
             resp.raise_for_status()
             data = resp.json()
             parts: list[str] = []
@@ -143,6 +167,10 @@ class ContentFetcher:
             return f"[Failed to fetch HF card: {e}]"
 
     async def _fetch_web_article(self, url: str) -> str:
+        http = self._http
+        if http is None:
+            return "[Content fetcher not started]"
+
         if not url or url.startswith("https://news.ycombinator.com"):
             return "[HN self-post — no external article]"
 
@@ -152,7 +180,7 @@ class ContentFetcher:
             return "[trafilatura not installed — cannot extract article]"
 
         try:
-            resp = await self._http.get(url)
+            resp = await http.get(url)
             resp.raise_for_status()
             html = resp.text
         except httpx.HTTPError as e:
