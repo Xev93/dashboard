@@ -42,6 +42,21 @@ cache.db-shm
 
 # Smoke test temp files
 /tmp/ai_dashboard_smoke.db*
+# AI/agent tooling
+.omc/
 .omx/
+.omo/
+.opencode/
+.sisyphus/
+.claude/
+.cursor/
+.cursorrules
+.windsurfrules
+.mcp.json
+.opencode.json
+CLAUDE.md
+GEMINI.md
+*.bak
+
 # Added by code-review-graph
 .code-review-graph/
