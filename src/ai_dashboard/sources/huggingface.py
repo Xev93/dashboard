@@ -15,9 +15,9 @@ class HuggingFaceAdapter:
     default_interval_seconds = 600
 
     _endpoints: dict[str, str] = {
-        "model": "https://huggingface.co/api/models?sort=likes&direction=-1&limit=100",
-        "dataset": "https://huggingface.co/api/datasets?sort=likes&direction=-1&limit=50",
-        "space": "https://huggingface.co/api/spaces?sort=likes&direction=-1&limit=50",
+        "model": "https://huggingface.co/api/models?sort=trendingScore&direction=-1&limit=30",
+        "dataset": "https://huggingface.co/api/datasets?sort=trendingScore&direction=-1&limit=20",
+        "space": "https://huggingface.co/api/spaces?sort=trendingScore&direction=-1&limit=20",
     }
 
     def __init__(self, http: httpx.AsyncClient, options: dict[str, Any]) -> None:
