@@ -80,7 +80,7 @@ SOURCE_CATALOG: tuple[SourceDef, ...] = (
         class_name="HalAdapter",
         tab_label="HL",
         tier="first_party",
-        content_mode="payload:abstract",
+        content_mode="web_article",
         default_options={
             "query": "artificial intelligence OR machine learning",
             "domain": "info",
