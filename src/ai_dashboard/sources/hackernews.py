@@ -39,11 +39,12 @@ class HackerNewsAdapter:
                 raise SourceRateLimited("Hacker News topstories rate limited")
             response.raise_for_status()
             story_ids = response.json()
+            top_stories = story_ids[:30]
             semaphore = asyncio.Semaphore(10)
             results = await asyncio.gather(
                 *[
                     self._fetch_story(story_id=story_id, semaphore=semaphore)
-                    for story_id in story_ids[:30]
+                    for story_id in top_stories
                 ],
                 return_exceptions=True,
             )
@@ -51,11 +52,11 @@ class HackerNewsAdapter:
             raise SourceError(f"Failed to fetch Hacker News stories: {exc}") from exc
 
         items: list[FeedItem] = []
-        for story_id, result in zip(story_ids[:30], results, strict=False):
+        for story_id, result in zip(top_stories, results, strict=False):
             if isinstance(result, Exception):
                 logger.warning(f"[hn] failed to fetch story {story_id}: {result}")
                 continue
-            if not result:
+            if not isinstance(result, dict):
                 continue
             if not self._matches(result):
                 continue

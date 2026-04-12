@@ -13,4 +13,5 @@ class ChronologicalAllSourcesStrategy:
         self.limit = limit
 
     async def items(self, db: Database, now: datetime) -> list[FeedItem]:
+        _ = now
         return await db.get_items(limit=self.limit)
