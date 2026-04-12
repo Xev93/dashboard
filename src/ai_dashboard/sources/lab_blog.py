@@ -13,11 +13,10 @@ import httpx
 from ..storage.models import FeedItem
 
 DEFAULT_FEEDS = [
-    "https://openai.com/blog/rss.xml",
+    "https://openai.com/news/rss.xml",
     "https://blog.google/technology/ai/rss/",
-    "https://ai.meta.com/blog/rss/",
-    "https://www.anthropic.com/feed.xml",
     "https://deepmind.google/blog/rss.xml",
+    "https://research.facebook.com/feed/",
 ]
 
 logger = logging.getLogger(__name__)
