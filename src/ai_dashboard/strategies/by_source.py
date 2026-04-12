@@ -20,5 +20,8 @@ class BySourceStrategy:
 
     async def items(self, db: Database, now: datetime) -> list[FeedItem]:
         _ = now
-        all_items = await db.get_items(limit=self._limit)
-        return [item for item in all_items if item.source_kind == self._source_kind]
+        try:
+            return await db.get_items(limit=self._limit, source_kind=self._source_kind)
+        except TypeError:
+            all_items = await db.get_items(limit=self._limit)
+            return [item for item in all_items if item.source_kind == self._source_kind]
