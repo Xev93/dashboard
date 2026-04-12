@@ -140,6 +140,12 @@ def cmd_daemon_status(_args: argparse.Namespace) -> int:
 
 
 def cmd_daemon_install(_args: argparse.Namespace) -> int:
+    if sys.platform != "darwin":
+        print(
+            "Error: daemon install/uninstall requires macOS (launchd). For Linux, use systemd manually.",
+            file=sys.stderr,
+        )
+        return 1
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     LAUNCHD_PLIST_PATH.parent.mkdir(parents=True, exist_ok=True)
     plist_data = {
@@ -162,6 +168,12 @@ def cmd_daemon_install(_args: argparse.Namespace) -> int:
 
 
 def cmd_daemon_uninstall(_args: argparse.Namespace) -> int:
+    if sys.platform != "darwin":
+        print(
+            "Error: daemon install/uninstall requires macOS (launchd). For Linux, use systemd manually.",
+            file=sys.stderr,
+        )
+        return 1
     result = subprocess.run(["launchctl", "unload", str(LAUNCHD_PLIST_PATH)])
     LAUNCHD_PLIST_PATH.unlink(missing_ok=True)
     return result.returncode

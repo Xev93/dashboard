@@ -46,9 +46,8 @@ def test_setup_logging_creates_log_file(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     log_path = tmp_path / "daemon.log"
-    monkeypatch.setattr(daemon, "_FOREGROUND_LOGGING", False)
 
-    daemon._setup_logging(log_path, "INFO")
+    daemon._setup_logging(log_path, "INFO", False)
 
     file_handlers = [
         handler
