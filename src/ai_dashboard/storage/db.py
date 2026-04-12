@@ -10,7 +10,14 @@ import aiosqlite
 from ai_dashboard.storage.models import FeedItem, _parse_iso
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+_ENGAGEMENT_KEYS: dict[str, str] = {
+    "hn": "points",
+    "github_trending": "stars",
+    "reddit": "score",
+    "huggingface": "likes",
+}
+MIN_SAMPLE_SIZE = 20
 
 
 SCHEMA_V1_SQL = """
@@ -42,10 +49,6 @@ CREATE TABLE IF NOT EXISTS user_state (
     value TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS schema_version (
-    version INTEGER PRIMARY KEY
-);
-
 CREATE TABLE IF NOT EXISTS content_cache (
     source_kind TEXT NOT NULL,
     source_uid  TEXT NOT NULL,
@@ -53,8 +56,29 @@ CREATE TABLE IF NOT EXISTS content_cache (
     fetched_at  TEXT NOT NULL,
     PRIMARY KEY (source_kind, source_uid)
 );
+"""
 
-INSERT OR IGNORE INTO schema_version(version) VALUES (1);
+
+SCHEMA_V2_SQL = """
+CREATE TABLE IF NOT EXISTS user_search_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    term TEXT NOT NULL,
+    searched_at REAL NOT NULL DEFAULT (unixepoch('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_search_history_term ON user_search_history(term);
+CREATE INDEX IF NOT EXISTS idx_search_history_time ON user_search_history(searched_at);
+
+CREATE TABLE IF NOT EXISTS item_view_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_kind TEXT NOT NULL,
+    source_uid TEXT NOT NULL,
+    action TEXT NOT NULL CHECK(action IN ('viewed', 'skipped')),
+    logged_at REAL NOT NULL DEFAULT (unixepoch('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_view_log_action ON item_view_log(action, logged_at);
+CREATE INDEX IF NOT EXISTS idx_view_log_source ON item_view_log(source_kind, logged_at);
+
+UPDATE schema_version SET version = 2;
 """
 
 
@@ -75,6 +99,7 @@ class Database:
         self._conn = await aiosqlite.connect(str(self.path))
         self._conn.row_factory = aiosqlite.Row
         await self._conn.execute("PRAGMA journal_mode=WAL")
+        await self._conn.execute("PRAGMA busy_timeout=5000")
         await self._conn.execute("PRAGMA synchronous=NORMAL")
         await self._conn.execute("PRAGMA foreign_keys=ON")
         await self._conn.commit()
@@ -95,7 +120,25 @@ class Database:
 
     async def init_schema(self) -> None:
         conn = self.connection
+        cursor = await conn.execute(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'schema_version'"
+        )
+        has_schema_version_table = await cursor.fetchone() is not None
+        await cursor.close()
+
+        await conn.execute(
+            "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL DEFAULT 1)"
+        )
+        if not has_schema_version_table:
+            await conn.execute("INSERT INTO schema_version(version) VALUES (1)")
+
         await conn.executescript(SCHEMA_V1_SQL)
+        cursor = await conn.execute("SELECT version FROM schema_version LIMIT 1")
+        row = await cursor.fetchone()
+        await cursor.close()
+        version = row["version"] if row else 1
+        if version < 2:
+            await conn.executescript(SCHEMA_V2_SQL)
         await conn.commit()
 
     async def upsert_items(self, items: list[FeedItem]) -> int:
@@ -172,6 +215,81 @@ class Database:
             (1 if seen else 0, item_id),
         )
         await conn.commit()
+
+    async def record_item_view(
+        self, source_kind: str, source_uid: str, action: str
+    ) -> None:
+        """Record a viewed or skipped action for ranking."""
+        conn = self.connection
+        await conn.execute(
+            "INSERT INTO item_view_log (source_kind, source_uid, action) VALUES (?, ?, ?)",
+            (source_kind, source_uid, action),
+        )
+        await conn.commit()
+
+    async def record_search_term(self, term: str) -> None:
+        """Record a search term for keyword_boost ranking."""
+        conn = self.connection
+        await conn.execute(
+            "INSERT INTO user_search_history (term) VALUES (?)",
+            (term,),
+        )
+        await conn.commit()
+
+    async def get_top_search_terms(self, limit: int = 10) -> list[str]:
+        """Get the most recent unique search terms for keyword_boost."""
+        conn = self.connection
+        cursor = await conn.execute(
+            "SELECT DISTINCT term FROM user_search_history ORDER BY searched_at DESC LIMIT ?",
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return [row[0] for row in rows]
+
+    async def get_skip_counts(self, last_n_views: int = 50) -> dict[str, int]:
+        """Count skips per source_kind in the last N view log entries.
+
+        Returns dict mapping source_kind → skip count.
+        """
+        conn = self.connection
+        cursor = await conn.execute(
+            """
+            SELECT source_kind, COUNT(*) as cnt
+            FROM (
+                SELECT source_kind, action FROM item_view_log
+                ORDER BY logged_at DESC LIMIT ?
+            ) WHERE action = 'skipped'
+            GROUP BY source_kind
+            """,
+            (last_n_views,),
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return {row[0]: row[1] for row in rows}
+
+    async def get_engagement_percentiles(self) -> dict[str, float]:
+        default_p95 = {
+            "hn": 500.0,
+            "github_trending": 10000.0,
+            "reddit": 1000.0,
+            "huggingface": 5000.0,
+        }
+        conn = self.connection
+        result: dict[str, float] = {}
+        for kind, json_key in _ENGAGEMENT_KEYS.items():
+            cursor = await conn.execute(
+                "SELECT CAST(json_extract(raw_payload, ?) AS REAL) as val FROM feed_items WHERE source_kind = ? AND json_extract(raw_payload, ?) IS NOT NULL ORDER BY val ASC",
+                (f"$.{json_key}", kind, f"$.{json_key}"),
+            )
+            rows = list(await cursor.fetchall())
+            await cursor.close()
+            if len(rows) >= MIN_SAMPLE_SIZE:
+                idx = int(len(rows) * 0.95)
+                result[kind] = max(float(rows[min(idx, len(rows) - 1)][0]), 1.0)
+            else:
+                result[kind] = default_p95.get(kind, 1.0)
+        return result
 
     async def get_user_state(self, key: str) -> str | None:
         conn = self.connection

@@ -1,4 +1,4 @@
-from ai_dashboard.app import main
+from ai_dashboard.cli import main
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

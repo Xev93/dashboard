@@ -27,7 +27,7 @@ dev = [
 ]
 
 [project.scripts]
-ai-dashboard = "ai_dashboard.app:main"
+ai-dashboard = "ai_dashboard.cli:main"
 
 [build-system]
 requires = ["hatchling"]

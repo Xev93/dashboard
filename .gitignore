@@ -43,3 +43,5 @@ cache.db-shm
 # Smoke test temp files
 /tmp/ai_dashboard_smoke.db*
 .omx/
+# Added by code-review-graph
+.code-review-graph/

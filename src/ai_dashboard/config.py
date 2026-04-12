@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import os
+from importlib import import_module
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 try:
-    import tomllib
+    tomllib = import_module("tomllib")
 except ModuleNotFoundError:
-    import tomli as tomllib  # type: ignore[no-redef]
+    tomllib = import_module("tomli")
 
 
 DEFAULT_HN_KEYWORDS = [
@@ -47,10 +48,22 @@ class SourceConfig:
 
 
 @dataclass
+class RankingConfig:
+    source_weight_first_party: float = 0.3
+    source_weight_community: float = 0.0
+    keyword_boost: float = 0.2
+    recency_decay_hours: float = 24.0
+    skip_penalty: float = 0.1
+    skip_window: int = 50
+    top_search_terms: int = 10
+
+
+@dataclass
 class AppConfig:
     sources: list[SourceConfig]
     db_path: Path
     log_level: str = "INFO"
+    ranking: RankingConfig = field(default_factory=RankingConfig)
 
     @classmethod
     def defaults(cls) -> "AppConfig":
@@ -60,8 +73,16 @@ class AppConfig:
                 SourceConfig(kind="hn", options={"keywords": DEFAULT_HN_KEYWORDS}),
                 SourceConfig(kind="github_trending"),
                 SourceConfig(kind="huggingface"),
+                SourceConfig(kind="lab_blog"),
+                SourceConfig(kind="papers_with_code"),
                 SourceConfig(
                     kind="newsletter", options={"feeds": DEFAULT_NEWSLETTER_FEEDS}
+                ),
+                SourceConfig(
+                    kind="reddit",
+                    options={
+                        "subreddits": ["MachineLearning", "artificial", "LocalLLaMA"]
+                    },
                 ),
             ],
             db_path=_default_db_path(),
@@ -89,7 +110,20 @@ class AppConfig:
             sources = cls.defaults().sources
         db_path = Path(data.get("db_path", _default_db_path()))
         log_level = data.get("log_level", "INFO")
-        return cls(sources=sources, db_path=db_path, log_level=log_level)
+        ranking_raw = data.get("ranking", {})
+        ranking = RankingConfig(
+            **{
+                k: v
+                for k, v in ranking_raw.items()
+                if k in RankingConfig.__dataclass_fields__
+            }
+        )
+        return cls(
+            sources=sources,
+            db_path=db_path,
+            log_level=log_level,
+            ranking=ranking,
+        )
 
 
 def _default_config_path() -> Path:

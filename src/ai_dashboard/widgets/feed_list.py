@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 from datetime import datetime, timezone
 
 from textual.message import Message
@@ -10,8 +11,28 @@ from ai_dashboard.storage.models import FeedItem
 from ai_dashboard.strategies.base import FeedListStrategy
 
 
-class FeedListWidget(DataTable):
+class FeedListWidget(DataTable[str]):
     class ItemSelected(Message):
+        item: FeedItem
+
+        def __init__(self, item: FeedItem) -> None:
+            super().__init__()
+            self.item = item
+
+    class ItemViewed(Message):
+        """Emitted when user dwells on item ≥2 seconds."""
+
+        item: FeedItem
+
+        def __init__(self, item: FeedItem) -> None:
+            super().__init__()
+            self.item = item
+
+    class ItemSkipped(Message):
+        """Emitted when user moves off item in <2 seconds."""
+
+        item: FeedItem
+
         def __init__(self, item: FeedItem) -> None:
             super().__init__()
             self.item = item
@@ -27,12 +48,14 @@ class FeedListWidget(DataTable):
         self.strategy = strategy
         self.db = db
         self._items: list[FeedItem] = []
+        self._current_item: FeedItem | None = None
+        self._highlight_time: float = 0.0
 
-    async def on_mount(self) -> None:
+    def on_mount(self) -> None:
         self.add_column("S", key="source")
         self.add_column("Title", key="title")
         self.add_column("Age", key="age")
-        await self.refresh_items()
+        self.run_worker(self.refresh_items(), exclusive=True)
 
     async def refresh_items(self) -> None:
         now = datetime.now(timezone.utc)
@@ -78,4 +101,14 @@ class FeedListWidget(DataTable):
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if 0 <= event.cursor_row < len(self._items):
-            self.post_message(self.ItemSelected(self._items[event.cursor_row]))
+            now = time.monotonic()
+            if self._current_item is not None:
+                dwell = now - self._highlight_time
+                if dwell >= 2.0:
+                    self.post_message(self.ItemViewed(self._current_item))
+                else:
+                    self.post_message(self.ItemSkipped(self._current_item))
+
+            self._current_item = self._items[event.cursor_row]
+            self._highlight_time = now
+            self.post_message(self.ItemSelected(self._current_item))
