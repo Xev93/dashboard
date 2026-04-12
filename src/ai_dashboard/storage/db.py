@@ -141,6 +141,7 @@ class Database:
         if version < 2:
             await conn.executescript(SCHEMA_V2_SQL)
         await conn.commit()
+        await self.evict_stale_cache()
 
     async def upsert_items(self, items: list[FeedItem]) -> int:
         if not items:
@@ -281,19 +282,49 @@ class Database:
             "huggingface": 5000.0,
         }
         conn = self.connection
-        result: dict[str, float] = {}
+        result: dict[str, float] = {
+            kind: default_p95.get(kind, 1.0) for kind in _ENGAGEMENT_KEYS
+        }
+        query_parts: list[str] = []
+        params: list[str] = []
+
         for kind, json_key in _ENGAGEMENT_KEYS.items():
-            cursor = await conn.execute(
-                "SELECT CAST(json_extract(raw_payload, ?) AS REAL) as val FROM feed_items WHERE source_kind = ? AND json_extract(raw_payload, ?) IS NOT NULL ORDER BY val ASC",
-                (f"$.{json_key}", kind, f"$.{json_key}"),
+            json_path = f"$.{json_key}"
+            query_parts.append(
+                """
+                SELECT ? AS source_kind, CAST(json_extract(raw_payload, ?) AS REAL) AS val
+                FROM feed_items
+                WHERE source_kind = ? AND json_extract(raw_payload, ?) IS NOT NULL
+                """
             )
-            rows = list(await cursor.fetchall())
-            await cursor.close()
-            if len(rows) >= MIN_SAMPLE_SIZE:
-                idx = int(len(rows) * 0.95)
-                result[kind] = max(float(rows[min(idx, len(rows) - 1)][0]), 1.0)
-            else:
-                result[kind] = default_p95.get(kind, 1.0)
+            params.extend((kind, json_path, kind, json_path))
+
+        cursor = await conn.execute(
+            f"""
+            WITH engagement_values AS (
+                {" UNION ALL ".join(query_parts)}
+            ),
+            ranked_values AS (
+                SELECT
+                    source_kind,
+                    val,
+                    COUNT(*) OVER (PARTITION BY source_kind) AS cnt,
+                    ROW_NUMBER() OVER (PARTITION BY source_kind ORDER BY val ASC) - 1 AS idx
+                FROM engagement_values
+            )
+            SELECT source_kind, cnt, val AS p95
+            FROM ranked_values
+            WHERE idx = MIN(CAST(cnt * 0.95 AS INTEGER), cnt - 1)
+            """,
+            params,
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+
+        for row in rows:
+            if row["cnt"] >= MIN_SAMPLE_SIZE and row["p95"] is not None:
+                result[row["source_kind"]] = max(float(row["p95"]), 1.0)
+
         return result
 
     async def get_user_state(self, key: str) -> str | None:
@@ -325,6 +356,15 @@ class Database:
         row = await cursor.fetchone()
         await cursor.close()
         return row["content"] if row else None
+
+    async def evict_stale_cache(self, max_age_days: int = 30) -> int:
+        conn = self.connection
+        cursor = await conn.execute(
+            "DELETE FROM content_cache WHERE fetched_at < unixepoch('now') - ? * 86400",
+            (max_age_days,),
+        )
+        await conn.commit()
+        return cursor.rowcount
 
     async def set_cached_content(
         self, source_kind: str, source_uid: str, content: str
