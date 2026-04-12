@@ -28,8 +28,8 @@ class ItemsArrived(Message):
 class AIDashboardApp(App):
     CSS = """
     #layout { layout: horizontal; height: 100%; }
-    #reading-pane { width: 2fr; border: solid $primary; overflow-y: auto; }
-    #feed-list { width: 1fr; border: solid $accent; }
+    #reading-pane { width: 2fr; height: 100%; border: solid $primary; overflow-y: scroll; }
+    #feed-list { width: 1fr; height: 100%; border: solid $accent; }
     """
 
     BINDINGS = [
@@ -131,11 +131,11 @@ class AIDashboardApp(App):
 
     def action_scroll_reading_up(self) -> None:
         pane = self.query_one("#reading-pane")
-        pane.scroll_page_up(animate=False)
+        pane.scroll_relative(y=-pane.container_size.height, animate=False)
 
     def action_scroll_reading_down(self) -> None:
         pane = self.query_one("#reading-pane")
-        pane.scroll_page_down(animate=False)
+        pane.scroll_relative(y=pane.container_size.height, animate=False)
 
     def action_scroll_reading_home(self) -> None:
         pane = self.query_one("#reading-pane")
