@@ -58,7 +58,6 @@ class AIDashboardApp(App[None]):
         Binding("end", "scroll_reading_end", "Bottom", priority=True),
         ("/", "open_filter", "Filter"),
         ("s", "cycle_strategy", "Ranked/Chrono"),
-        ("?", "help", "Help"),
     ]
 
     def __init__(self, config: AppConfig) -> None:
@@ -275,9 +274,6 @@ class AIDashboardApp(App[None]):
     def action_prev_tab(self) -> None:
         tabs = self.query_one(SourceTabs)
         tabs.select_tab((tabs.active_index - 1) % len(tabs.TABS))
-
-    def action_help(self) -> None:
-        pass
 
 
 def main() -> int:
