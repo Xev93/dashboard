@@ -1,0 +1,11 @@
+{
+  "by": "ml_engineer",
+  "descendants": 45,
+  "id": 42000002,
+  "kids": [],
+  "score": 87,
+  "time": 1776038000,
+  "title": "New transformer architecture achieves 10x speedup on LLM inference",
+  "type": "story",
+  "url": "https://arxiv.org/abs/2604.12345"
+}

@@ -1,0 +1,22 @@
+[
+  {
+    "id": "MetaAI/llama-4-8b-instruct",
+    "author": "MetaAI",
+    "pipeline_tag": "text-generation",
+    "downloads": 125000,
+    "likes": 4521,
+    "tags": ["llama", "instruct", "text-generation"],
+    "createdAt": "2026-04-10T14:30:00.000Z",
+    "lastModified": "2026-04-11T09:00:00.000Z"
+  },
+  {
+    "id": "anthropic-community/claude-style-embed",
+    "author": "anthropic-community",
+    "pipeline_tag": "feature-extraction",
+    "downloads": 8700,
+    "likes": 312,
+    "tags": ["embeddings", "sentence-transformers"],
+    "createdAt": "2026-04-10T09:15:00.000Z",
+    "lastModified": "2026-04-10T18:00:00.000Z"
+  }
+]

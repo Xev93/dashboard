@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Import AI</title>
+    <link>https://jack-clark.net/</link>
+    <description>Weekly AI research summary</description>
+    <language>en-us</language>
+    <item>
+      <title>Import AI #412: GPT-5 released; robots fold laundry; state space scaling laws</title>
+      <link>https://jack-clark.net/2026/04/11/import-ai-412/</link>
+      <guid>https://jack-clark.net/2026/04/11/import-ai-412/</guid>
+      <pubDate>Mon, 11 Apr 2026 09:00:00 GMT</pubDate>
+      <description>This week: OpenAI ships GPT-5 with significantly improved reasoning. Figure AI demonstrates multi-step laundry folding. A new paper on state space scaling laws suggests we're nowhere near saturating Mamba-style architectures.</description>
+    </item>
+    <item>
+      <title>Import AI #411: Sparse MoE breakthroughs; agent safety evals; chip shortage update</title>
+      <link>https://jack-clark.net/2026/04/04/import-ai-411/</link>
+      <guid>https://jack-clark.net/2026/04/04/import-ai-411/</guid>
+      <pubDate>Mon, 04 Apr 2026 09:00:00 GMT</pubDate>
+      <description>DeepMind publishes new results on sparse mixture-of-experts scaling. Anthropic releases updated agent safety evaluation benchmarks.</description>
+    </item>
+  </channel>
+</rss>

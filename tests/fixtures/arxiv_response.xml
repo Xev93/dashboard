@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <link href="http://arxiv.org/api/query?search_query=cat:cs.LG" rel="self" type="application/atom+xml"/>
+  <title type="html">arXiv Query: search_query=cat:cs.LG</title>
+  <id>http://arxiv.org/api/test</id>
+  <updated>2026-04-11T00:00:00-04:00</updated>
+  <opensearch:totalResults xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">2</opensearch:totalResults>
+  <opensearch:startIndex xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">0</opensearch:startIndex>
+  <opensearch:itemsPerPage xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/">10</opensearch:itemsPerPage>
+  <entry>
+    <id>http://arxiv.org/abs/2604.12345v1</id>
+    <updated>2026-04-11T10:00:00Z</updated>
+    <published>2026-04-11T10:00:00Z</published>
+    <title>A Novel Transformer Architecture for Efficient Language Modeling</title>
+    <summary>We introduce a novel transformer architecture that achieves state-of-the-art performance on language modeling tasks while using 40% fewer parameters. Our approach combines sparse attention with adaptive computation to dynamically allocate compute per token.</summary>
+    <author><name>Jane Researcher</name></author>
+    <author><name>John Scientist</name></author>
+    <link href="http://arxiv.org/abs/2604.12345v1" rel="alternate" type="text/html"/>
+    <link title="pdf" href="http://arxiv.org/pdf/2604.12345v1" rel="related" type="application/pdf"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.LG"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CL" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2604.12346v1</id>
+    <updated>2026-04-11T09:30:00Z</updated>
+    <published>2026-04-11T09:30:00Z</published>
+    <title>Diffusion Models for Structured Reasoning</title>
+    <summary>Recent advances in diffusion models have shown remarkable capabilities in generative tasks. We extend these approaches to structured reasoning problems.</summary>
+    <author><name>Alice Deep</name></author>
+    <link href="http://arxiv.org/abs/2604.12346v1" rel="alternate" type="text/html"/>
+    <arxiv:primary_category xmlns:arxiv="http://arxiv.org/schemas/atom" term="cs.AI"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+  </entry>
+</feed>
