@@ -4,6 +4,7 @@ import webbrowser
 from datetime import datetime, timezone
 
 from textual.app import App, ComposeResult
+from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.message import Message
 
@@ -36,10 +37,10 @@ class AIDashboardApp(App):
         ("r", "refresh_all", "Refresh"),
         ("o", "open_url", "Open URL"),
         ("space", "toggle_seen", "Toggle seen"),
-        ("pageup", "scroll_reading_up", "Page Up"),
-        ("pagedown", "scroll_reading_down", "Page Down"),
-        ("home", "scroll_reading_home", "Top"),
-        ("end", "scroll_reading_end", "Bottom"),
+        Binding("pageup", "scroll_reading_up", "Page Up", priority=True),
+        Binding("pagedown", "scroll_reading_down", "Page Down", priority=True),
+        Binding("home", "scroll_reading_home", "Top", priority=True),
+        Binding("end", "scroll_reading_end", "Bottom", priority=True),
         ("?", "help", "Help"),
     ]
 
