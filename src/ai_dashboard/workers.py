@@ -78,7 +78,7 @@ class PollingOrchestrator:
                 raise
             except SourceRateLimited:
                 sleep_seconds = float(adapter.default_interval_seconds) * 2
-            except (SourceError, Exception):
+            except Exception:  # SourceError is handled the same way here.
                 state = await self.db.get_source_state(adapter.kind) or {}
                 failures = int(state.get("consecutive_failures") or 0) + 1
                 await self.db.update_source_state(
@@ -93,13 +93,6 @@ class PollingOrchestrator:
         for task in self._tasks:
             task.cancel()
 
-        if self._http is not None:
-            try:
-                await asyncio.wait_for(self._http.aclose(), timeout=timeout / 2)
-            except asyncio.TimeoutError:
-                pass
-            self._http = None
-
         try:
             await asyncio.wait_for(
                 asyncio.gather(*self._tasks, return_exceptions=True),
@@ -107,6 +100,13 @@ class PollingOrchestrator:
             )
         except asyncio.TimeoutError:
             pass
+
+        if self._http is not None:
+            try:
+                await asyncio.wait_for(self._http.aclose(), timeout=timeout / 2)
+            except asyncio.TimeoutError:
+                pass
+            self._http = None
 
         self._tasks.clear()
         self._wake_events.clear()

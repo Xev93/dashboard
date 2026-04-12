@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import fcntl
 import logging
 import os
 import signal
 import sys
 from pathlib import Path
+from typing import IO
 
 from ai_dashboard.config import AppConfig
 from ai_dashboard.storage.db import Database
@@ -19,16 +21,15 @@ PID_PATH = DATA_DIR / "daemon.pid"
 LOG_PATH = DATA_DIR / "daemon.log"
 
 _LOG = logging.getLogger(__name__)
-_FOREGROUND_LOGGING = False
 
 
 async def run_daemon(config: AppConfig, *, foreground: bool = False) -> int:
-    global _FOREGROUND_LOGGING
-
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    _FOREGROUND_LOGGING = foreground
-    _setup_logging(LOG_PATH, config.log_level)
-    _write_pid(PID_PATH)
+    _setup_logging(LOG_PATH, config.log_level, foreground)
+    pid_file = _write_pid(PID_PATH)
+    if pid_file is None:
+        _LOG.error("Another daemon is already running")
+        return 1
 
     db = Database(config.db_path)
     orchestrator: PollingOrchestrator | None = None
@@ -71,22 +72,32 @@ async def run_daemon(config: AppConfig, *, foreground: bool = False) -> int:
         if orchestrator is not None:
             await orchestrator.stop(timeout=2.0)
         await db.close()
+        if pid_file is not None:
+            pid_file.close()
         _remove_pid(PID_PATH)
 
 
-def _write_pid(pid_path: Path) -> None:
+def _write_pid(pid_path: Path) -> IO[str] | None:
     pid_path.parent.mkdir(parents=True, exist_ok=True)
-    pid_path.write_text(f"{os.getpid()}\nai-dashboard-daemon\n", encoding="utf-8")
+    pid_file = pid_path.open("w", encoding="utf-8")
+    try:
+        fcntl.flock(pid_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        pid_file.close()
+        return None
+    pid_file.write(f"{os.getpid()}\nai-dashboard-daemon\n")
+    pid_file.flush()
+    return pid_file
 
 
 def _remove_pid(pid_path: Path) -> None:
     pid_path.unlink(missing_ok=True)
 
 
-def _setup_logging(log_path: Path, level: str) -> None:
+def _setup_logging(log_path: Path, level: str, foreground: bool) -> None:
     log_path.parent.mkdir(parents=True, exist_ok=True)
     handlers: list[logging.Handler] = [logging.FileHandler(log_path)]
-    if _FOREGROUND_LOGGING:
+    if foreground:
         handlers.append(logging.StreamHandler(sys.stderr))
     else:
         handlers.append(logging.NullHandler())
