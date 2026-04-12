@@ -32,17 +32,25 @@ class FeedItem:
 
     @classmethod
     def from_row(cls, row: Any) -> "FeedItem":
-        return cls(
-            id=row["id"],
-            source_kind=row["source_kind"],
-            source_uid=row["source_uid"],
-            title=row["title"],
-            url=row["url"],
-            published_at=_parse_iso(row["published_at"]),
-            raw_payload=json.loads(row["raw_payload"]) if row["raw_payload"] else {},
-            seen=bool(row["seen"]),
-            created_at=_parse_iso(row["created_at"]),
-        )
+        try:
+            return cls(
+                id=row["id"],
+                source_kind=row["source_kind"],
+                source_uid=row["source_uid"],
+                title=row["title"],
+                url=row["url"],
+                published_at=_parse_iso(row["published_at"]),
+                raw_payload=json.loads(row["raw_payload"])
+                if row["raw_payload"]
+                else {},
+                seen=bool(row["seen"]),
+                created_at=_parse_iso(row["created_at"]),
+            )
+        except KeyError as exc:
+            missing_key = exc.args[0]
+            raise KeyError(
+                f"FeedItem.from_row missing required column: {missing_key}"
+            ) from exc
 
     def with_id(self, new_id: int) -> "FeedItem":
         return replace(self, id=new_id)
