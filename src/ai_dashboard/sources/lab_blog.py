@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 from collections.abc import Sequence
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
