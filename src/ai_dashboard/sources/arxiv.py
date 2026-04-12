@@ -18,7 +18,7 @@ class ArxivAdapter:
     _lock: ClassVar[asyncio.Lock] = asyncio.Lock()
     _last_request_time: ClassVar[float] = 0.0
     _endpoint: ClassVar[str] = (
-        "http://export.arxiv.org/api/query?"
+        "https://export.arxiv.org/api/query?"
         "search_query=cat:cs.LG+OR+cat:cs.CL+OR+cat:cs.AI+OR+cat:cs.CV&"
         "sortBy=submittedDate&sortOrder=descending&max_results=50"
     )

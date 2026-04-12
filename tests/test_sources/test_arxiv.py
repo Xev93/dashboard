@@ -12,7 +12,7 @@ from ai_dashboard.sources.base import SourceError, SourceRateLimited
 
 FIXTURE_PATH = Path(__file__).parents[1] / "fixtures" / "arxiv_response.xml"
 ARXIV_URL = (
-    "http://export.arxiv.org/api/query?"
+    "https://export.arxiv.org/api/query?"
     "search_query=cat:cs.LG+OR+cat:cs.CL+OR+cat:cs.AI+OR+cat:cs.CV&"
     "sortBy=submittedDate&sortOrder=descending&max_results=50"
 )
