@@ -68,7 +68,7 @@ class NewsletterAdapter:
             return None
 
         publication_name = parsed_feed.feed.get("title") or urlparse(feed_url).netloc
-        feed_url_hash = hashlib.md5(feed_url.encode()).hexdigest()[:8]
+        feed_url_hash = hashlib.sha256(feed_url.encode()).hexdigest()[:12]
         now = datetime.now(timezone.utc)
 
         items: list[FeedItem] = []
