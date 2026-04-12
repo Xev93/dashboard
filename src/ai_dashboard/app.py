@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import webbrowser
 from datetime import datetime, timezone
@@ -23,6 +24,8 @@ from .widgets.filter_bar import FilterBar
 from .widgets.reading_pane import ReadingPane
 from .widgets.source_tabs import SourceTabs
 from .workers import PollingOrchestrator
+
+logger = logging.getLogger(__name__)
 
 
 class ItemsArrived(Message):
@@ -79,14 +82,11 @@ class AIDashboardApp(App[None]):
         yield FilterBar(id="filter-bar")
 
     async def on_load(self) -> None:
-        if self.db._conn is None:
+        if not self.db.is_connected:
             await self.db.connect()
             await self.db.init_schema()
 
     async def on_mount(self) -> None:
-        if self.db._conn is None:
-            await self.db.connect()
-            await self.db.init_schema()
         await self.content_fetcher.start()
         feed_list = self.query_one(FeedListWidget)
         await feed_list.refresh_items()
@@ -208,13 +208,14 @@ class AIDashboardApp(App[None]):
             feed_list = self.query_one(FeedListWidget)
             webbrowser.open(feed_list._items[feed_list.cursor_row].url)
         except Exception:
-            pass
+            logger.warning("Failed to open URL", exc_info=True)
 
     def action_toggle_seen(self) -> None:
         try:
             feed_list = self.query_one(FeedListWidget)
             item = feed_list._items[feed_list.cursor_row]
         except Exception:
+            logger.warning("Failed to toggle seen", exc_info=True)
             return
         if item.id is not None:
             self.run_worker(self._toggle_seen_worker(item.id))
