@@ -40,5 +40,5 @@ packages = ["src/ai_dashboard"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 filterwarnings = [
-    "ignore::DeprecationWarning",
+    "ignore::DeprecationWarning:feedparser",
 ]
