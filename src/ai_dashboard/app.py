@@ -36,6 +36,10 @@ class AIDashboardApp(App):
         ("r", "refresh_all", "Refresh"),
         ("o", "open_url", "Open URL"),
         ("space", "toggle_seen", "Toggle seen"),
+        ("pageup", "scroll_reading_up", "Page Up"),
+        ("pagedown", "scroll_reading_down", "Page Down"),
+        ("home", "scroll_reading_home", "Top"),
+        ("end", "scroll_reading_end", "Bottom"),
         ("?", "help", "Help"),
     ]
 
@@ -123,6 +127,22 @@ class AIDashboardApp(App):
     async def _toggle_seen_worker(self, item_id: int) -> None:
         await self.db.mark_seen(item_id)
         self.post_message(ItemsArrived(count=0, source_kind="local"))
+
+    def action_scroll_reading_up(self) -> None:
+        pane = self.query_one("#reading-pane")
+        pane.scroll_page_up(animate=False)
+
+    def action_scroll_reading_down(self) -> None:
+        pane = self.query_one("#reading-pane")
+        pane.scroll_page_down(animate=False)
+
+    def action_scroll_reading_home(self) -> None:
+        pane = self.query_one("#reading-pane")
+        pane.scroll_home(animate=False)
+
+    def action_scroll_reading_end(self) -> None:
+        pane = self.query_one("#reading-pane")
+        pane.scroll_end(animate=False)
 
     def action_help(self) -> None:
         pass
