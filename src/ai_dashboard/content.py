@@ -186,9 +186,18 @@ class ContentFetcher:
         except httpx.HTTPError as e:
             return f"[Failed to fetch article: {e}]"
 
-        text = await asyncio.to_thread(
-            trafilatura.extract, html, include_comments=False, include_tables=True
-        )
+        try:
+            text = await asyncio.wait_for(
+                asyncio.to_thread(
+                    trafilatura.extract,
+                    html,
+                    include_comments=False,
+                    include_tables=True,
+                ),
+                timeout=10.0,
+            )
+        except asyncio.TimeoutError:
+            text = None
         if not text:
             tree = HTMLParser(html)
             for tag in tree.css("script, style, nav, header, footer"):
