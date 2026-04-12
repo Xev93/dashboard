@@ -5,13 +5,12 @@ from pathlib import Path
 from typing import AsyncIterator
 
 import pytest
-import pytest_asyncio
 
 from ai_dashboard.storage.db import Database
 from ai_dashboard.storage.models import FeedItem
 
 
-@pytest_asyncio.fixture
+@pytest.fixture
 async def db(tmp_path: Path) -> AsyncIterator[Database]:
     d = Database(tmp_path / "test.db")
     await d.connect()
