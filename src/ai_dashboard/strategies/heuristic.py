@@ -32,7 +32,7 @@ class HeuristicRankingStrategy:
 
     async def items(self, db: Database, now: datetime) -> list[FeedItem]:
         all_items = await db.get_items(limit=self._limit)
-        ranking_db = cast(_SupportsHeuristicQueries, cast(object, db))
+        ranking_db = cast(_SupportsHeuristicQueries, db)
         top_terms = await ranking_db.get_top_search_terms(
             limit=self._config.top_search_terms
         )
