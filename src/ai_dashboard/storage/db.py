@@ -389,7 +389,26 @@ class Database:
                 )
         await conn.commit()
 
+    _ALLOWED_PRAGMAS: frozenset[str] = frozenset(
+        {
+            "journal_mode",
+            "busy_timeout",
+            "synchronous",
+            "wal_checkpoint",
+            "integrity_check",
+            "foreign_keys",
+            "user_version",
+            "page_size",
+            "cache_size",
+            "table_info",
+        }
+    )
+
     async def pragma(self, name: str) -> Any:
+        if name not in self._ALLOWED_PRAGMAS:
+            raise ValueError(
+                f"PRAGMA {name!r} not in allowlist: {sorted(self._ALLOWED_PRAGMAS)}"
+            )
         conn = self.connection
         cursor = await conn.execute(f"PRAGMA {name}")
         row = await cursor.fetchone()
