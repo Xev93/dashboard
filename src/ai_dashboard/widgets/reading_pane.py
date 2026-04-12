@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from rich.console import Group
+from rich.markdown import Markdown
 from rich.text import Text
 from textual.widgets import Static
 
@@ -35,7 +36,7 @@ class ReadingPane(Static):
 
     def _render_item(
         self, item: FeedItem | None, content: str | None = None
-    ) -> Text | Group:
+    ) -> Text | Group | Markdown:
         if item is None:
             return Text("No item selected.", style="dim")
         if item.source_kind == "arxiv":
@@ -48,7 +49,9 @@ class ReadingPane(Static):
             return self._render_huggingface(item, content)
         return self._render_newsletter(item, content)
 
-    def _render_arxiv(self, item: FeedItem, content: str | None = None) -> Text | Group:
+    def _render_arxiv(
+        self, item: FeedItem, content: str | None = None
+    ) -> Text | Group | Markdown:
         payload = item.raw_payload
         lines = [
             "",
@@ -60,9 +63,11 @@ class ReadingPane(Static):
             "Abstract:",
             payload.get("abstract", "").strip(),
         ]
-        return self._group_with_content(item.title, lines, content)
+        return self._group_with_content(item.title, lines, content, item.source_kind)
 
-    def _render_hn(self, item: FeedItem, content: str | None = None) -> Text | Group:
+    def _render_hn(
+        self, item: FeedItem, content: str | None = None
+    ) -> Text | Group | Markdown:
         payload = item.raw_payload
         lines = [
             "",
@@ -71,11 +76,11 @@ class ReadingPane(Static):
             "",
             payload.get("text", "") or "(no text)",
         ]
-        return self._group_with_content(item.title, lines, content)
+        return self._group_with_content(item.title, lines, content, item.source_kind)
 
     def _render_github_trending(
         self, item: FeedItem, content: str | None = None
-    ) -> Text | Group:
+    ) -> Text | Group | Markdown:
         payload = item.raw_payload
         lines = [
             "",
@@ -85,12 +90,15 @@ class ReadingPane(Static):
             payload.get("description") or "(no description)",
         ]
         return self._group_with_content(
-            f"{payload.get('owner')}/{payload.get('name')}", lines, content
+            f"{payload.get('owner')}/{payload.get('name')}",
+            lines,
+            content,
+            item.source_kind,
         )
 
     def _render_huggingface(
         self, item: FeedItem, content: str | None = None
-    ) -> Text | Group:
+    ) -> Text | Group | Markdown:
         payload = item.raw_payload
         lines = [
             "",
@@ -106,11 +114,12 @@ class ReadingPane(Static):
             f"{payload.get('hf_kind', '').upper()}: {payload.get('id', '')}",
             lines,
             content,
+            item.source_kind,
         )
 
     def _render_newsletter(
         self, item: FeedItem, content: str | None = None
-    ) -> Text | Group:
+    ) -> Text | Group | Markdown:
         payload = item.raw_payload
         lines = [
             "",
@@ -120,10 +129,22 @@ class ReadingPane(Static):
             "",
             payload.get("summary", "").strip() or "(no summary)",
         ]
-        return self._group_with_content(item.title, lines, content)
+        return self._group_with_content(item.title, lines, content, item.source_kind)
+
+    def _strip_html(self, text: str) -> str:
+        if "<" not in text:
+            return text
+        from selectolax.parser import HTMLParser
+
+        tree = HTMLParser(text)
+        return tree.body.text(separator="\n", strip=True) if tree.body else text
 
     def _group_with_content(
-        self, title: str, lines: list[str], content: str | None
+        self,
+        title: str,
+        lines: list[str],
+        content: str | None,
+        source_kind: str = "",
     ) -> Group:
         renderables = [Text(title, style="bold"), *[Text(line) for line in lines]]
         if content is None:
@@ -136,5 +157,11 @@ class ReadingPane(Static):
                     ]
                 )
         else:
-            renderables.extend([Text(""), Text("─" * 40, style="dim"), Text(content)])
+            renderables.append(Text(""))
+            renderables.append(Text("─" * 40, style="dim"))
+            if source_kind in ("github_trending", "huggingface"):
+                renderables.append(Markdown(content))
+            else:
+                cleaned = self._strip_html(content)
+                renderables.append(Text(cleaned))
         return Group(*renderables)

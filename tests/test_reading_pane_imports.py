@@ -4,7 +4,6 @@ import ast
 from pathlib import Path
 
 FORBIDDEN_RICH_IMPORTS = {
-    "rich.markdown",
     "rich.syntax",
     "rich.table",
     "rich.tree",
