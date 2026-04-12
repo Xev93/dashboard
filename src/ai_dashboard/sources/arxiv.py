@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import time
 from datetime import datetime, timezone
-from typing import Any, ClassVar
+from typing import Any, ClassVar, cast
 
 import feedparser
 import httpx
@@ -26,6 +26,10 @@ class ArxivAdapter:
     def __init__(self, http: httpx.AsyncClient, options: dict[str, Any]) -> None:
         self.http = http
         self.options = options
+
+    @classmethod
+    def reset_rate_limiter(cls) -> None:
+        cls._last_request_time = 0.0
 
     async def fetch(self) -> list[FeedItem]:
         try:
@@ -51,10 +55,12 @@ class ArxivAdapter:
         items: list[FeedItem] = []
         now = datetime.now(timezone.utc)
 
-        for entry in parsed.entries:
+        for raw_entry in parsed.entries:
+            entry = cast(Any, raw_entry)
             source_uid = entry.id.rsplit("/", 1)[-1]
-            published_struct = entry.get("published_parsed") or entry.get(
-                "updated_parsed"
+            published_struct = cast(
+                tuple[int, int, int, int, int, int] | None,
+                entry.get("published_parsed") or entry.get("updated_parsed"),
             )
             published_at = (
                 datetime(*published_struct[:6], tzinfo=timezone.utc)

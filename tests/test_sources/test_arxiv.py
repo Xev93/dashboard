@@ -24,7 +24,7 @@ async def test_arxiv_fetch_parses_fixture() -> None:
     with respx.mock() as mock:
         mock.get(ARXIV_URL).respond(status_code=200, text=fixture)
         async with httpx.AsyncClient() as client:
-            ArxivAdapter._last_request_time = 0.0
+            ArxivAdapter.reset_rate_limiter()
             result = await ArxivAdapter(http=client, options={}).fetch()
 
     assert len(result) == 2
@@ -39,7 +39,7 @@ async def test_arxiv_raw_payload_fields() -> None:
     with respx.mock() as mock:
         mock.get(ARXIV_URL).respond(status_code=200, text=fixture)
         async with httpx.AsyncClient() as client:
-            ArxivAdapter._last_request_time = 0.0
+            ArxivAdapter.reset_rate_limiter()
             result = await ArxivAdapter(http=client, options={}).fetch()
 
     assert set(result[0].raw_payload) >= {
@@ -57,7 +57,7 @@ async def test_arxiv_http_error_raises_source_error() -> None:
     with respx.mock() as mock:
         mock.get(ARXIV_URL).respond(status_code=500)
         async with httpx.AsyncClient() as client:
-            ArxivAdapter._last_request_time = 0.0
+            ArxivAdapter.reset_rate_limiter()
             with pytest.raises(SourceError):
                 await ArxivAdapter(http=client, options={}).fetch()
 
@@ -67,6 +67,6 @@ async def test_arxiv_429_raises_rate_limited() -> None:
     with respx.mock() as mock:
         mock.get(ARXIV_URL).respond(status_code=429)
         async with httpx.AsyncClient() as client:
-            ArxivAdapter._last_request_time = 0.0
+            ArxivAdapter.reset_rate_limiter()
             with pytest.raises(SourceRateLimited):
                 await ArxivAdapter(http=client, options={}).fetch()
