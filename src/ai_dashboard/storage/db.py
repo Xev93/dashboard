@@ -46,6 +46,14 @@ CREATE TABLE IF NOT EXISTS schema_version (
     version INTEGER PRIMARY KEY
 );
 
+CREATE TABLE IF NOT EXISTS content_cache (
+    source_kind TEXT NOT NULL,
+    source_uid  TEXT NOT NULL,
+    content     TEXT NOT NULL,
+    fetched_at  TEXT NOT NULL,
+    PRIMARY KEY (source_kind, source_uid)
+);
+
 INSERT OR IGNORE INTO schema_version(version) VALUES (1);
 """
 
@@ -183,6 +191,32 @@ class Database:
             ON CONFLICT(key) DO UPDATE SET value = excluded.value
             """,
             (key, value),
+        )
+        await conn.commit()
+
+    async def get_cached_content(self, source_kind: str, source_uid: str) -> str | None:
+        conn = self.connection
+        cursor = await conn.execute(
+            "SELECT content FROM content_cache WHERE source_kind = ? AND source_uid = ?",
+            (source_kind, source_uid),
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+        return row["content"] if row else None
+
+    async def set_cached_content(
+        self, source_kind: str, source_uid: str, content: str
+    ) -> None:
+        conn = self.connection
+        await conn.execute(
+            """
+            INSERT INTO content_cache(source_kind, source_uid, content, fetched_at)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(source_kind, source_uid) DO UPDATE SET
+                content = excluded.content,
+                fetched_at = excluded.fetched_at
+            """,
+            (source_kind, source_uid, content, datetime.now(timezone.utc).isoformat()),
         )
         await conn.commit()
 

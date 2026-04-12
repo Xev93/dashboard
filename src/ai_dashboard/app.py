@@ -8,6 +8,7 @@ from textual.containers import Horizontal
 from textual.message import Message
 
 from ai_dashboard.config import AppConfig
+from ai_dashboard.content import ContentFetcher
 from ai_dashboard.storage.db import Database
 from ai_dashboard.strategies.chronological import ChronologicalAllSourcesStrategy
 from ai_dashboard.strategies.base import FeedListStrategy
@@ -42,12 +43,13 @@ class AIDashboardApp(App):
         super().__init__()
         self.config = config
         self.db = Database(config.db_path)
+        self.content_fetcher = ContentFetcher(self.db)
         self.strategy: FeedListStrategy = ChronologicalAllSourcesStrategy(limit=500)
         self.orchestrator: PollingOrchestrator | None = None
 
     def compose(self) -> ComposeResult:
         with Horizontal(id="layout"):
-            yield ReadingPane(id="reading-pane")
+            yield ReadingPane(content_fetcher=self.content_fetcher, id="reading-pane")
             yield FeedListWidget(self.strategy, self.db, id="feed-list")
 
     async def on_load(self) -> None:
@@ -59,6 +61,7 @@ class AIDashboardApp(App):
         if self.db._conn is None:
             await self.db.connect()
             await self.db.init_schema()
+        await self.content_fetcher.start()
         feed_list = self.query_one(FeedListWidget)
         await feed_list.refresh_items()
         self.orchestrator = PollingOrchestrator(
@@ -74,6 +77,7 @@ class AIDashboardApp(App):
         await self.db.set_user_state(
             "last_check_time", datetime.now(timezone.utc).isoformat()
         )
+        await self.content_fetcher.stop()
         await self.db.close()
 
     async def _post_items_arrived(self, count: int, source_kind: str) -> None:
