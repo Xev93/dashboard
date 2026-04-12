@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import cast
 
 from ai_dashboard.storage.db import Database
 from ai_dashboard.storage.models import FeedItem
@@ -21,9 +22,15 @@ class FilteredStrategy:
 
     async def items(self, db: Database, now: datetime) -> list[FeedItem]:
         all_items = await self._base.items(db, now)
-        return [
-            item
-            for item in all_items
-            if self._text in (item.title or "").lower()
-            or self._text in (item.url or "").lower()
-        ]
+        return [item for item in all_items if self._matches(item)]
+
+    def _matches(self, item: FeedItem) -> bool:
+        if self._text in (item.title or "").lower():
+            return True
+        if self._text in (item.url or "").lower():
+            return True
+        if item.raw_payload:
+            for val in cast(dict[str, object], item.raw_payload).values():
+                if isinstance(val, str) and self._text in val.lower():
+                    return True
+        return False
