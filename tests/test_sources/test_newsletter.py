@@ -87,10 +87,11 @@ async def test_newsletter_multiple_feeds() -> None:
 
 @pytest.mark.asyncio
 async def test_newsletter_one_feed_failure_does_not_break_others(
-    capsys: pytest.CaptureFixture[str],
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     ok_url = "https://example.com/feed-ok"
     bad_url = "https://example.com/feed-bad"
+    caplog.set_level("WARNING")
 
     async with httpx.AsyncClient() as client:
         adapter = NewsletterAdapter(http=client, options={"feeds": [bad_url, ok_url]})
@@ -102,7 +103,6 @@ async def test_newsletter_one_feed_failure_does_not_break_others(
 
             items = await adapter.fetch()
 
-    captured = capsys.readouterr()
     assert len(items) == 2
-    assert bad_url in captured.err
-    assert "failed" in captured.err
+    assert bad_url in caplog.text
+    assert "failed" in caplog.text

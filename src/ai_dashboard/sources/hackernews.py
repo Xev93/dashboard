@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import re
-import sys
 from datetime import datetime, timezone
 from typing import Any
 
@@ -11,6 +11,9 @@ import httpx
 from ai_dashboard.config import DEFAULT_HN_KEYWORDS
 from ai_dashboard.sources.base import SourceError, SourceRateLimited
 from ai_dashboard.storage.models import FeedItem
+
+
+logger = logging.getLogger(__name__)
 
 
 class HackerNewsAdapter:
@@ -50,9 +53,7 @@ class HackerNewsAdapter:
         items: list[FeedItem] = []
         for story_id, result in zip(story_ids[:30], results, strict=False):
             if isinstance(result, Exception):
-                print(
-                    f"[hn] failed to fetch story {story_id}: {result}", file=sys.stderr
-                )
+                logger.warning(f"[hn] failed to fetch story {story_id}: {result}")
                 continue
             if not result:
                 continue

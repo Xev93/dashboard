@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import sys
+import logging
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlparse
@@ -13,6 +13,9 @@ import httpx
 from ai_dashboard.config import DEFAULT_NEWSLETTER_FEEDS
 from ai_dashboard.sources.base import SourceError, SourceRateLimited
 from ai_dashboard.storage.models import FeedItem
+
+
+logger = logging.getLogger(__name__)
 
 
 class NewsletterAdapter:
@@ -35,7 +38,7 @@ class NewsletterAdapter:
         for feed_url, result in zip(self._feeds, results, strict=False):
             if isinstance(result, Exception):
                 failed_feeds += 1
-                print(f"[newsletter] failed {feed_url}: {result}", file=sys.stderr)
+                logger.warning(f"[newsletter] failed {feed_url}: {result}")
                 continue
             if result is None:
                 failed_feeds += 1
@@ -54,14 +57,13 @@ class NewsletterAdapter:
                 raise SourceRateLimited(f"newsletter feed rate limited: {feed_url}")
             response.raise_for_status()
         except httpx.HTTPError as exc:
-            print(f"[newsletter] failed {feed_url}: {exc}", file=sys.stderr)
+            logger.warning(f"[newsletter] failed {feed_url}: {exc}")
             return None
 
         parsed_feed = feedparser.parse(response.content)
         if parsed_feed.bozo and not parsed_feed.entries:
-            print(
-                f"[newsletter] skipped malformed feed {feed_url}: {parsed_feed.bozo_exception}",
-                file=sys.stderr,
+            logger.warning(
+                f"[newsletter] skipped malformed feed {feed_url}: {parsed_feed.bozo_exception}"
             )
             return None
 
