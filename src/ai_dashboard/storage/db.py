@@ -85,6 +85,8 @@ class Database:
     relies on per-connection state. See ADR-5 in the implementation plan.
     """
 
+    _VALID_VIEW_ACTIONS: frozenset[str] = frozenset({"viewed", "skipped"})
+
     def __init__(self, path: Path | str) -> None:
         self.path = Path(path)
         self._conn: aiosqlite.Connection | None = None
@@ -106,6 +108,10 @@ class Database:
             finally:
                 await self._conn.close()
                 self._conn = None
+
+    @property
+    def is_connected(self) -> bool:
+        return self._conn is not None
 
     @property
     def connection(self) -> aiosqlite.Connection:
@@ -215,6 +221,10 @@ class Database:
         self, source_kind: str, source_uid: str, action: str
     ) -> None:
         """Record a viewed or skipped action for ranking."""
+        if action not in self._VALID_VIEW_ACTIONS:
+            raise ValueError(
+                f"Invalid action {action!r}, must be one of {sorted(self._VALID_VIEW_ACTIONS)}"
+            )
         conn = self.connection
         await conn.execute(
             "INSERT INTO item_view_log (source_kind, source_uid, action) VALUES (?, ?, ?)",
@@ -370,23 +380,19 @@ class Database:
                 ),
             )
         else:
-            sets: list[str] = []
-            params: list[Any] = []
-            if last_fetched is not None:
-                sets.append("last_fetched = ?")
-                params.append(last_fetched.isoformat())
-            if next_fetch is not None:
-                sets.append("next_fetch = ?")
-                params.append(next_fetch.isoformat())
-            if consecutive_failures is not None:
-                sets.append("consecutive_failures = ?")
-                params.append(consecutive_failures)
-            if sets:
-                params.append(kind)
-                await conn.execute(
-                    f"UPDATE sources SET {', '.join(sets)} WHERE kind = ?",
-                    tuple(params),
-                )
+            await conn.execute(
+                """UPDATE sources SET
+                    last_fetched = COALESCE(?, last_fetched),
+                    next_fetch = COALESCE(?, next_fetch),
+                    consecutive_failures = COALESCE(?, consecutive_failures)
+                WHERE kind = ?""",
+                (
+                    last_fetched.isoformat() if last_fetched is not None else None,
+                    next_fetch.isoformat() if next_fetch is not None else None,
+                    consecutive_failures,
+                    kind,
+                ),
+            )
         await conn.commit()
 
     _ALLOWED_PRAGMAS: frozenset[str] = frozenset(
