@@ -10,6 +10,9 @@ from ai_dashboard.storage.db import Database
 from ai_dashboard.storage.models import FeedItem
 
 
+MAX_CONTENT_LENGTH = 15_000
+
+
 class ContentFetcher:
     def __init__(self, db: Database) -> None:
         self._db = db
@@ -95,8 +98,11 @@ class ContentFetcher:
                 body = tree.css_first("article.ltx_document") or tree.css_first("body")
                 if body:
                     text = body.text(separator="\n", strip=True)
-                    if len(text) > 15000:
-                        text = text[:15000] + "\n\n[... truncated at 15,000 chars]"
+                    if len(text) > MAX_CONTENT_LENGTH:
+                        text = (
+                            text[:MAX_CONTENT_LENGTH]
+                            + "\n\n[... truncated at 15,000 chars]"
+                        )
                     return text
         except httpx.HTTPError:
             pass
@@ -119,8 +125,11 @@ class ContentFetcher:
                 resp = await http.get(url)
                 if resp.status_code == 200:
                     text = resp.text
-                    if len(text) > 15000:
-                        text = text[:15000] + "\n\n[... truncated at 15,000 chars]"
+                    if len(text) > MAX_CONTENT_LENGTH:
+                        text = (
+                            text[:MAX_CONTENT_LENGTH]
+                            + "\n\n[... truncated at 15,000 chars]"
+                        )
                     return text
             except httpx.HTTPError:
                 continue
@@ -145,8 +154,8 @@ class ContentFetcher:
             resp = await http.get(readme_url)
             if resp.status_code == 200:
                 text = resp.text
-                if len(text) > 15000:
-                    text = text[:15000] + "\n\n[... truncated]"
+                if len(text) > MAX_CONTENT_LENGTH:
+                    text = text[:MAX_CONTENT_LENGTH] + "\n\n[... truncated]"
                 return text
         except httpx.HTTPError:
             pass
@@ -213,6 +222,6 @@ class ContentFetcher:
                 else "[Could not extract content]"
             )
 
-        if len(text) > 15000:
-            text = text[:15000] + "\n\n[... truncated at 15,000 chars]"
+        if len(text) > MAX_CONTENT_LENGTH:
+            text = text[:MAX_CONTENT_LENGTH] + "\n\n[... truncated at 15,000 chars]"
         return text

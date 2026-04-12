@@ -65,11 +65,9 @@ class AIDashboardApp(App[None]):
         self.config = config
         self.db = Database(config.db_path)
         self.content_fetcher = ContentFetcher(self.db)
-        self._base_strategy: FeedListStrategy = ChronologicalAllSourcesStrategy(
-            limit=500
-        )
-        self._active_strategy: FeedListStrategy = self._base_strategy
         self._ranked_mode: bool = False
+        self._base_strategy: FeedListStrategy = self._default_strategy()
+        self._active_strategy: FeedListStrategy = self._base_strategy
         self.strategy: FeedListStrategy = self._active_strategy
         self.orchestrator: PollingOrchestrator | None = None
 
@@ -205,7 +203,10 @@ class AIDashboardApp(App[None]):
     def action_open_url(self) -> None:
         try:
             feed_list = self.query_one(FeedListWidget)
-            webbrowser.open(feed_list._items[feed_list.cursor_row].url)
+            url = feed_list._items[feed_list.cursor_row].url
+            if not url or not url.startswith(("http://", "https://")):
+                return
+            webbrowser.open(url)
         except Exception:
             logger.warning("Failed to open URL", exc_info=True)
 
@@ -226,10 +227,7 @@ class AIDashboardApp(App[None]):
 
     def action_cycle_strategy(self) -> None:
         self._ranked_mode = not self._ranked_mode
-        if self._ranked_mode:
-            self._base_strategy = HeuristicRankingStrategy(self.config.ranking)
-        else:
-            self._base_strategy = ChronologicalAllSourcesStrategy(limit=500)
+        self._base_strategy = self._default_strategy()
         self._active_strategy = self._base_strategy
         self.run_worker(self._apply_strategy())
 
