@@ -224,7 +224,7 @@ async def test_record_invalid_action(tmp_path: Path) -> None:
     try:
         await db.init_schema()
 
-        with pytest.raises(sqlite3.IntegrityError):
+        with pytest.raises(ValueError):
             await db.record_item_view("hn", "item-1", "other")
     finally:
         await db.close()
