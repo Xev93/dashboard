@@ -76,8 +76,6 @@ class FeedListWidget(DataTable):
             "newsletter": "NL",
         }.get(kind, kind[:2].upper())
 
-    async def on_data_table_row_highlighted(
-        self, event: DataTable.RowHighlighted
-    ) -> None:
+    def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if 0 <= event.cursor_row < len(self._items):
-            await self.post_message(self.ItemSelected(self._items[event.cursor_row]))
+            self.post_message(self.ItemSelected(self._items[event.cursor_row]))
