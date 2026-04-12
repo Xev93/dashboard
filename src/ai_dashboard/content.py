@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 
 import httpx
 from selectolax.parser import HTMLParser
+from urllib.parse import urlparse
 
 from ai_dashboard import USER_AGENT
 from ai_dashboard.source_catalog import CATALOG_BY_KIND
@@ -12,6 +14,36 @@ from ai_dashboard.storage.models import FeedItem
 
 
 MAX_CONTENT_LENGTH = 15_000
+_ALLOWED_SCHEMES = frozenset({"http", "https"})
+_BLOCKED_HOSTS = frozenset(
+    {
+        "localhost",
+        "127.0.0.1",
+        "0.0.0.0",
+        "::1",
+        "metadata.google.internal",
+        "169.254.169.254",
+    }
+)
+
+
+def _is_safe_url(url: str) -> bool:
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    if parsed.scheme not in _ALLOWED_SCHEMES:
+        return False
+    hostname = (parsed.hostname or "").lower()
+    if hostname in _BLOCKED_HOSTS:
+        return False
+    try:
+        ip = ipaddress.ip_address(hostname)
+        if ip.is_private or ip.is_loopback or ip.is_link_local:
+            return False
+    except ValueError:
+        pass
+    return True
 
 
 class ContentFetcher:
@@ -88,6 +120,8 @@ class ContentFetcher:
             return item.raw_payload.get("abstract", "")
 
         html_url = f"https://arxiv.org/html/{arxiv_id}"
+        if not _is_safe_url(html_url):
+            return item.raw_payload.get("abstract", "[No abstract available]")
         try:
             resp = await http.get(html_url)
             if resp.status_code == 200:
@@ -122,6 +156,8 @@ class ContentFetcher:
 
         for branch in ("main", "master"):
             url = f"https://raw.githubusercontent.com/{owner}/{name}/{branch}/README.md"
+            if not _is_safe_url(url):
+                return item.raw_payload.get("description", "[README not found]")
             try:
                 resp = await http.get(url)
                 if resp.status_code == 200:
@@ -151,6 +187,8 @@ class ContentFetcher:
             hf_kind, "models"
         )
         readme_url = f"https://huggingface.co/{hf_id}/resolve/main/README.md"
+        if not _is_safe_url(readme_url):
+            return "[No card content available]"
         try:
             resp = await http.get(readme_url)
             if resp.status_code == 200:
@@ -162,6 +200,8 @@ class ContentFetcher:
             pass
 
         url = f"https://huggingface.co/api/{kind_plural}/{hf_id}"
+        if not _is_safe_url(url):
+            return "[No card content available]"
         try:
             resp = await http.get(url, headers={"Accept": "application/json"})
             resp.raise_for_status()
@@ -190,6 +230,8 @@ class ContentFetcher:
             return "[trafilatura not installed — cannot extract article]"
 
         try:
+            if not _is_safe_url(url):
+                return "[URL blocked by security policy]"
             resp = await http.get(url)
             resp.raise_for_status()
             html = resp.text
