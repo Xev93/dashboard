@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from textual.message import Message
 from textual.widgets import DataTable
 
+from ai_dashboard.source_catalog import CATALOG_BY_KIND
 from ai_dashboard.storage.db import Database
 from ai_dashboard.storage.models import FeedItem
 from ai_dashboard.strategies.base import FeedListStrategy
@@ -91,13 +92,12 @@ class FeedListWidget(DataTable[str]):
         return s
 
     def _source_tag(self, kind: str) -> str:
-        return {
-            "arxiv": "AX",
-            "hn": "HN",
-            "github_trending": "GH",
-            "huggingface": "HF",
-            "newsletter": "NL",
-        }.get(kind, kind[:2].upper())
+        tag = (
+            CATALOG_BY_KIND[kind].tab_label
+            if kind in CATALOG_BY_KIND
+            else kind[:2].upper()
+        )
+        return tag
 
     def on_data_table_row_highlighted(self, event: DataTable.RowHighlighted) -> None:
         if 0 <= event.cursor_row < len(self._items):

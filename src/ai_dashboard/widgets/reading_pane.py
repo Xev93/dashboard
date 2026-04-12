@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
+
 from selectolax.parser import HTMLParser
 from textual.widgets import Markdown
 
 from ai_dashboard.content import ContentFetcher
+from ai_dashboard.source_catalog import CATALOG_BY_KIND
 from ai_dashboard.storage.models import FeedItem
 
 
@@ -57,7 +60,7 @@ class ReadingPane(Markdown):
             return self._meta_hf(item, payload)
         return self._meta_newsletter(item, payload)
 
-    def _meta_arxiv(self, item: FeedItem, payload: dict) -> str:
+    def _meta_arxiv(self, item: FeedItem, payload: dict[str, Any]) -> str:
         authors = ", ".join(payload.get("authors", []))
         return (
             f"# {item.title}\n\n"
@@ -68,7 +71,7 @@ class ReadingPane(Markdown):
             f"### Abstract\n\n{payload.get('abstract', '').strip()}"
         )
 
-    def _meta_hn(self, item: FeedItem, payload: dict) -> str:
+    def _meta_hn(self, item: FeedItem, payload: dict[str, Any]) -> str:
         text = payload.get("text", "")
         return (
             f"# {item.title}\n\n"
@@ -78,7 +81,7 @@ class ReadingPane(Markdown):
             f"**URL:** {item.url}\n\n" + (f"> {text}\n\n" if text else "")
         )
 
-    def _meta_github(self, item: FeedItem, payload: dict) -> str:
+    def _meta_github(self, item: FeedItem, payload: dict[str, Any]) -> str:
         return (
             f"# {payload.get('owner', '')}/{payload.get('name', '')}\n\n"
             f"⭐ **{payload.get('stars', 0):,}** · "
@@ -87,7 +90,7 @@ class ReadingPane(Markdown):
             f"{payload.get('description') or ''}"
         )
 
-    def _meta_hf(self, item: FeedItem, payload: dict) -> str:
+    def _meta_hf(self, item: FeedItem, payload: dict[str, Any]) -> str:
         downloads = payload.get("downloads")
         downloads_text = (
             f"{downloads:,}" if isinstance(downloads, int) else (downloads or "—")
@@ -102,14 +105,70 @@ class ReadingPane(Markdown):
             f"**URL:** {item.url}"
         )
 
-    def _meta_newsletter(self, item: FeedItem, payload: dict) -> str:
-        return (
-            f"# {item.title}\n\n"
-            f"**Publication:** {payload.get('publication', '')}\n\n"
-            f"**Published:** {item.published_at.strftime('%Y-%m-%d %H:%M UTC')}\n\n"
-            f"**URL:** {item.url}\n\n"
-            f"### Summary\n\n{payload.get('summary', '').strip()}"
+    def _meta_newsletter(self, item: FeedItem, payload: dict[str, Any]) -> str:
+        source = CATALOG_BY_KIND.get(item.source_kind)
+        tier = (
+            source.tier.replace("_", " ").title()
+            if source is not None
+            else item.source_kind
         )
+        lines = [f"# {item.title}", ""]
+
+        if source is not None:
+            lines.extend([f"**Tier:** {tier}", ""])
+
+        if payload.get("publication"):
+            lines.extend([f"**Publication:** {payload.get('publication')}", ""])
+
+        authors = payload.get("authors")
+        if authors:
+            if isinstance(authors, str):
+                authors_text = authors
+            else:
+                authors_text = ", ".join(str(author) for author in authors)
+            lines.extend([f"**Authors:** {authors_text}", ""])
+
+        if payload.get("venue"):
+            lines.extend([f"**Venue:** {payload.get('venue')}", ""])
+
+        abstract = payload.get("abstract")
+        if abstract:
+            lines.extend(["### Abstract", "", abstract.strip(), ""])
+
+        summary = payload.get("summary")
+        if summary:
+            lines.extend(["### Summary", "", summary.strip(), ""])
+
+        available_keys = sorted(payload)
+        if available_keys:
+            lines.extend(["### Payload", ""])
+            for key in available_keys:
+                value = payload.get(key)
+                if key == "abstract" and abstract:
+                    continue
+                if key == "summary" and summary:
+                    continue
+                if key == "authors" and authors:
+                    continue
+                if key == "publication":
+                    continue
+                if value in (None, "", [], {}, ()):
+                    continue
+                if isinstance(value, list):
+                    value_text = ", ".join(str(entry) for entry in value)
+                else:
+                    value_text = str(value)
+                lines.append(f"**{key.replace('_', ' ').title()}:** {value_text}")
+            lines.append("")
+
+        lines.extend(
+            [
+                f"**Published:** {item.published_at.strftime('%Y-%m-%d %H:%M UTC')}",
+                "",
+                f"**URL:** {item.url}",
+            ]
+        )
+        return "\n".join(lines)
 
     def _prepare_content(self, content: str, source_kind: str) -> str:
         if not content:
