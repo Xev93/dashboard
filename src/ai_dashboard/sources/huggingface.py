@@ -56,7 +56,11 @@ class HuggingFaceAdapter:
         self, kind_prefix: str, payload: list[dict[str, Any]]
     ) -> list[FeedItem]:
         now = datetime.now(timezone.utc)
-        return [self._build_item(kind_prefix, item, now) for item in payload]
+        return [
+            self._build_item(kind_prefix, item, now)
+            for item in payload
+            if item.get("likes", 0) >= 1
+        ]
 
     def _build_item(
         self,
