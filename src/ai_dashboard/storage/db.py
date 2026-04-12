@@ -140,8 +140,28 @@ class Database:
         version = row["version"] if row else 1
         if version < 2:
             await conn.executescript(SCHEMA_V2_SQL)
+        await self._clean_newsletter_hash_migration(conn)
         await conn.commit()
         await self.evict_stale_cache()
+
+    async def _clean_newsletter_hash_migration(
+        self, conn: aiosqlite.Connection
+    ) -> None:
+        """One-time cleanup: remove newsletter items with old 8-char MD5 UIDs.
+
+        M-1 changed feed_url_hash from MD5(8 chars) to SHA256(12 chars),
+        creating duplicate entries. Keep the newer SHA256-prefixed rows,
+        delete the old MD5-prefixed ones by matching on shorter prefix.
+        """
+        await conn.execute(
+            """DELETE FROM feed_items
+               WHERE source_kind = 'newsletter'
+               AND id NOT IN (
+                   SELECT MAX(id) FROM feed_items
+                   WHERE source_kind = 'newsletter'
+                   GROUP BY title
+               )"""
+        )
 
     async def upsert_items(self, items: list[FeedItem]) -> int:
         if not items:
