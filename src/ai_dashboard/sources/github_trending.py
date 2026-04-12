@@ -16,10 +16,7 @@ class GithubTrendingAdapter:
     kind = "github_trending"
     default_interval_seconds = 1800
     _user_agent = "ai-dashboard/0.1 (+https://github.com/user/ai-dashboard)"
-    _endpoints = (
-        "https://github.com/trending?since=daily&spoken_language_code=en",
-        "https://github.com/trending/python?since=daily",
-    )
+    _endpoints = ("https://github.com/trending?since=daily",)
     _default_keywords = [
         "AI",
         "ML",
@@ -29,6 +26,7 @@ class GithubTrendingAdapter:
         "diffusion",
         "neural",
         "agent",
+        "agentic",
         "fine-tun",
         "embedding",
         "RAG",
