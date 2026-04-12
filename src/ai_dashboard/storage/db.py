@@ -124,13 +124,12 @@ class Database:
                 update_cursor = await conn.execute(
                     """
                     UPDATE feed_items
-                    SET title = ?, url = ?, published_at = ?, raw_payload = ?
+                    SET title = ?, url = ?, raw_payload = ?
                     WHERE source_kind = ? AND source_uid = ?
                     """,
                     (
                         item.title,
                         item.url,
-                        item.published_at.isoformat(),
                         payload_json,
                         item.source_kind,
                         item.source_uid,

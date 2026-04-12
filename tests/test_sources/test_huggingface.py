@@ -9,11 +9,15 @@ from ai_dashboard.sources.base import SourceError, SourceRateLimited
 from ai_dashboard.sources.huggingface import HuggingFaceAdapter
 
 
-MODELS_URL = "https://huggingface.co/api/models?sort=createdAt&direction=-1&limit=30"
-DATASETS_URL = (
-    "https://huggingface.co/api/datasets?sort=createdAt&direction=-1&limit=20"
+MODELS_URL = (
+    "https://huggingface.co/api/models?sort=trendingScore&direction=-1&limit=30"
 )
-SPACES_URL = "https://huggingface.co/api/spaces?sort=createdAt&direction=-1&limit=20"
+DATASETS_URL = (
+    "https://huggingface.co/api/datasets?sort=trendingScore&direction=-1&limit=20"
+)
+SPACES_URL = (
+    "https://huggingface.co/api/spaces?sort=trendingScore&direction=-1&limit=20"
+)
 
 
 @pytest.mark.asyncio
