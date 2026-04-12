@@ -3,16 +3,7 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
-from enum import StrEnum
 from typing import Any
-
-
-class SourceKind(StrEnum):
-    ARXIV = "arxiv"
-    HN = "hn"
-    GITHUB_TRENDING = "github_trending"
-    HUGGINGFACE = "huggingface"
-    NEWSLETTER = "newsletter"
 
 
 @dataclass(frozen=True, slots=True)
