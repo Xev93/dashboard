@@ -27,7 +27,7 @@ class ItemsArrived(Message):
 class AIDashboardApp(App):
     CSS = """
     #layout { layout: horizontal; height: 100%; }
-    #reading-pane { width: 2fr; border: solid $primary; }
+    #reading-pane { width: 2fr; border: solid $primary; overflow-y: auto; }
     #feed-list { width: 1fr; border: solid $accent; }
     """
 
