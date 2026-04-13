@@ -104,15 +104,18 @@ class ContentFetcher:
         return ""
 
     async def _fetch_core_pdf(self, item: FeedItem) -> str:
-        download_url = (item.raw_payload or {}).get("download_url", "")
-        if download_url and _is_safe_url(download_url):
-            text = await self._fetch_web_article(download_url)
-            if text and text != "[No content available]":
-                return text
         abstract = (item.raw_payload or {}).get("abstract", "")
+        page_url = item.url or ""
+        is_pdf = page_url.lower().endswith(".pdf")
+        if not is_pdf and page_url and _is_safe_url(page_url):
+            text = await self._fetch_web_article(page_url)
+            if text and not text.startswith("["):
+                if abstract:
+                    return f"{abstract}\n\n---\n\n{text}"
+                return text
         if abstract:
             return abstract
-        return await self._fetch_web_article(item.url)
+        return ""
 
     @staticmethod
     def _fetch_from_payload(item: FeedItem, key: str) -> str:
