@@ -43,6 +43,7 @@ cache.db-shm
 # Smoke test temp files
 /tmp/ai_dashboard_smoke.db*
 # AI/agent tooling
+AGENTS.md
 .omc/
 .omx/
 .omo/
