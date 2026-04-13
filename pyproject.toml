@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Terminal UI for tracking cutting-edge AI developments (delta feed from arXiv, HN, GitHub Trending, HuggingFace, and AI newsletters)"
 requires-python = ">=3.11"
 readme = "README.md"
-license = { text = "MIT" }
+license = { text = "Apache-2.0" }
 authors = [
     { name = "AI Dashboard Contributors" },
 ]
