@@ -57,7 +57,11 @@ async def test_core_parses_results() -> None:
         with respx.mock(assert_all_called=True) as mock:
             _ = mock.get(
                 CORE_URL,
-                params={"q": "artificial intelligence machine learning", "limit": 25},
+                params={
+                    "q": "artificial intelligence machine learning",
+                    "limit": 25,
+                    "sort": "createdDate:desc",
+                },
                 headers={"Authorization": "Bearer test-key"},
             ).respond(status_code=200, json=CORE_PAYLOAD)
 
@@ -76,6 +80,7 @@ async def test_core_parses_results() -> None:
         "authors": ["Author One"],
         "doi": "10.1234/test",
         "citation_count": 5,
+        "download_url": "https://example.com/paper.pdf",
     }
 
 
@@ -92,7 +97,11 @@ async def test_core_handles_401(caplog: pytest.LogCaptureFixture) -> None:
         with respx.mock(assert_all_called=True) as mock:
             _ = mock.get(
                 CORE_URL,
-                params={"q": "artificial intelligence machine learning", "limit": 25},
+                params={
+                    "q": "artificial intelligence machine learning",
+                    "limit": 25,
+                    "sort": "createdDate:desc",
+                },
                 headers={"Authorization": "Bearer test-key"},
             ).respond(status_code=401, json={"error": "unauthorized"})
 

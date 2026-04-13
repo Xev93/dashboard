@@ -97,9 +97,22 @@ class ContentFetcher:
             return await self._fetch_hf_card(item)
         elif mode == "web_article":
             return await self._fetch_web_article(item.url)
+        elif mode == "core_pdf":
+            return await self._fetch_core_pdf(item)
         elif mode.startswith("payload:"):
             return self._fetch_from_payload(item, mode.split(":", 1)[1])
         return ""
+
+    async def _fetch_core_pdf(self, item: FeedItem) -> str:
+        download_url = (item.raw_payload or {}).get("download_url", "")
+        if download_url and _is_safe_url(download_url):
+            text = await self._fetch_web_article(download_url)
+            if text and text != "[No content available]":
+                return text
+        abstract = (item.raw_payload or {}).get("abstract", "")
+        if abstract:
+            return abstract
+        return await self._fetch_web_article(item.url)
 
     @staticmethod
     def _fetch_from_payload(item: FeedItem, key: str) -> str:

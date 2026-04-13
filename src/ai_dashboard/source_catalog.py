@@ -31,7 +31,7 @@ SOURCE_CATALOG: tuple[SourceDef, ...] = (
         class_name="CoreAdapter",
         tab_label="CO",
         tier="aggregator",
-        content_mode="payload:abstract",
+        content_mode="core_pdf",
         default_options={"query": "artificial intelligence machine learning"},
         enabled=False,
     ),

@@ -34,7 +34,7 @@ class CoreAdapter:
         try:
             response = await self._http.get(
                 self._endpoint,
-                params={"q": self._query, "limit": 25},
+                params={"q": self._query, "limit": 25, "sort": "createdDate:desc"},
                 headers={"Authorization": f"Bearer {self._api_key}"},
             )
             if response.status_code == 429:
@@ -91,12 +91,15 @@ class CoreAdapter:
             source_uid=f"core_{result_id}",
             title=title,
             url=self._work_url(result_id, result.get("downloadUrl")),
-            published_at=self._published_at(result.get("publishedDate")),
+            published_at=self._published_at(
+                result.get("createdDate") or result.get("publishedDate")
+            ),
             raw_payload={
                 "abstract": str(result.get("abstract") or "")[:500],
                 "authors": authors,
                 "doi": str(result.get("doi") or ""),
                 "citation_count": self._citation_count(result.get("citationCount")),
+                "download_url": str(result.get("downloadUrl") or ""),
             },
         )
 
