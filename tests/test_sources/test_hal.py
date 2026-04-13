@@ -20,7 +20,7 @@ HAL_PAYLOAD = {
                 "title_s": ["Test Paper"],
                 "uri_s": "https://hal.archives-ouvertes.fr/hal-001",
                 "abstract_s": ["Abstract"],
-                "producedDate_tdate": "2025-01-01T00:00:00Z",
+                "modifiedDate_tdate": "2025-01-01T00:00:00Z",
                 "authFullName_s": ["Author One"],
             }
         ]
@@ -54,9 +54,9 @@ async def test_hal_parses_docs() -> None:
                     "q": "artificial intelligence OR machine learning",
                     "fq": "domainAllCode_s:info*",
                     "rows": 25,
-                    "sort": "producedDate_tdate desc",
+                    "sort": "modifiedDate_tdate desc",
                     "wt": "json",
-                    "fl": "halId_s,title_s,uri_s,abstract_s,producedDate_tdate,authFullName_s",
+                    "fl": "halId_s,title_s,uri_s,abstract_s,modifiedDate_tdate,authFullName_s",
                 },
             ).respond(status_code=200, json=HAL_PAYLOAD)
 
@@ -94,9 +94,9 @@ async def test_hal_handles_error() -> None:
                     "q": "artificial intelligence OR machine learning",
                     "fq": "domainAllCode_s:info*",
                     "rows": 25,
-                    "sort": "producedDate_tdate desc",
+                    "sort": "modifiedDate_tdate desc",
                     "wt": "json",
-                    "fl": "halId_s,title_s,uri_s,abstract_s,producedDate_tdate,authFullName_s",
+                    "fl": "halId_s,title_s,uri_s,abstract_s,modifiedDate_tdate,authFullName_s",
                 },
             ).respond(status_code=500, json={"detail": "server error"})
 

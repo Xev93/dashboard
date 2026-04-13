@@ -30,10 +30,10 @@ class HalAdapter:
             "q": self._query,
             "fq": f"domainAllCode_s:{self._domain}*",
             "rows": 25,
-            "sort": "producedDate_tdate desc",
+            "sort": "modifiedDate_tdate desc",
             "wt": "json",
             "fl": (
-                "halId_s,title_s,uri_s,abstract_s,producedDate_tdate,authFullName_s"
+                "halId_s,title_s,uri_s,abstract_s,modifiedDate_tdate,authFullName_s"
             ),
         }
 
@@ -77,7 +77,7 @@ class HalAdapter:
 
             title = self._first_value(doc.get("title_s"))
             abstract = self._first_value(doc.get("abstract_s"))
-            published_at = self._parse_datetime(doc.get("producedDate_tdate"), now)
+            published_at = self._parse_datetime(doc.get("modifiedDate_tdate"), now)
             authors = self._string_list(doc.get("authFullName_s"))
 
             items.append(
