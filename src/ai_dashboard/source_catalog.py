@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
 
 
 @dataclass(frozen=True)
@@ -13,7 +12,7 @@ class SourceDef:
     tier: str
     content_mode: str
     engagement_key: str | None = None
-    default_options: dict[str, Any] = field(default_factory=dict)
+    default_options: dict[str, object] = field(default_factory=dict)
     enabled: bool = True
 
 
@@ -25,6 +24,16 @@ SOURCE_CATALOG: tuple[SourceDef, ...] = (
         tab_label="AX",
         tier="first_party",
         content_mode="arxiv",
+    ),
+    SourceDef(
+        kind="core",
+        module="ai_dashboard.sources.core",
+        class_name="CoreAdapter",
+        tab_label="CO",
+        tier="aggregator",
+        content_mode="payload:abstract",
+        default_options={"query": "artificial intelligence machine learning"},
+        enabled=False,
     ),
     SourceDef(
         kind="dblp",
@@ -173,6 +182,7 @@ ENGAGEMENT_KEYS: dict[str, str] = {
 }
 _TAB_ORDER: tuple[str, ...] = (
     "arxiv",
+    "core",
     "dblp",
     "hn",
     "github_trending",
