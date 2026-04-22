@@ -16,6 +16,7 @@ dependencies = [
     "defusedxml>=0.7",
     "aiosqlite>=0.20",
     "trafilatura>=1.8",
+    "litellm>=1.40",
 ]
 
 [project.optional-dependencies]

@@ -4,7 +4,7 @@ import os
 from dataclasses import dataclass, field
 from importlib import import_module
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ai_dashboard.source_catalog import CATALOG_BY_KIND, SOURCE_CATALOG
 
@@ -14,8 +14,12 @@ except ModuleNotFoundError:
     tomllib = import_module("tomli")
 
 
-DEFAULT_HN_KEYWORDS = list(CATALOG_BY_KIND["hn"].default_options["keywords"])
-DEFAULT_NEWSLETTER_FEEDS = list(CATALOG_BY_KIND["newsletter"].default_options["feeds"])
+DEFAULT_HN_KEYWORDS = list(
+    cast(list[str], CATALOG_BY_KIND["hn"].default_options["keywords"])
+)
+DEFAULT_NEWSLETTER_FEEDS = list(
+    cast(list[str], CATALOG_BY_KIND["newsletter"].default_options["feeds"])
+)
 
 
 @dataclass
@@ -38,11 +42,23 @@ class RankingConfig:
 
 
 @dataclass
+class AIConfig:
+    enabled: bool = False
+    model: str = "openai/gpt-4o-mini"
+    api_key: str = ""
+    api_base: str = ""
+    temperature: float = 0.3
+    max_tokens: int = 1024
+    timeout: int = 30
+
+
+@dataclass
 class AppConfig:
     sources: list[SourceConfig]
     db_path: Path
     log_level: str = "INFO"
     ranking: RankingConfig = field(default_factory=RankingConfig)
+    ai: AIConfig = field(default_factory=AIConfig)
 
     @classmethod
     def defaults(cls) -> "AppConfig":
@@ -99,11 +115,16 @@ class AppConfig:
                 if k in RankingConfig.__dataclass_fields__
             }
         )
+        ai_raw = data.get("ai", {})
+        ai = AIConfig(
+            **{k: v for k, v in ai_raw.items() if k in AIConfig.__dataclass_fields__}
+        )
         return cls(
             sources=sources,
             db_path=db_path,
             log_level=log_level,
             ranking=ranking,
+            ai=ai,
         )
 
 
