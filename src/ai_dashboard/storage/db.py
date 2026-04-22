@@ -11,7 +11,7 @@ from ai_dashboard.source_catalog import ENGAGEMENT_KEYS as _ENGAGEMENT_KEYS
 from ai_dashboard.storage.models import FeedItem, _parse_iso
 
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 MIN_SAMPLE_SIZE = 20
 
 
@@ -91,6 +91,13 @@ UPDATE schema_version SET version = 3;
 """
 
 
+SCHEMA_V4_SQL = """
+ALTER TABLE feed_items ADD COLUMN sentiment TEXT DEFAULT NULL;
+CREATE INDEX IF NOT EXISTS idx_feed_items_sentiment ON feed_items(sentiment);
+UPDATE schema_version SET version = 4;
+"""
+
+
 class Database:
     """Single-connection async SQLite wrapper with WAL mode.
 
@@ -157,6 +164,9 @@ class Database:
             version = 2
         if version < 3:
             await conn.executescript(SCHEMA_V3_SQL)
+            version = 3
+        if version < 4:
+            await conn.executescript(SCHEMA_V4_SQL)
         await self._clean_newsletter_hash_migration(conn)
         await conn.commit()
         await self.evict_stale_cache()
@@ -291,7 +301,7 @@ class Database:
         conn = self.connection
         if source_kind is not None:
             sql = """
-                SELECT id, source_kind, source_uid, title, url, published_at, raw_payload, seen, created_at
+                SELECT id, source_kind, source_uid, title, url, published_at, raw_payload, seen, sentiment, created_at
                 FROM feed_items
                 WHERE source_kind = ?
                 ORDER BY published_at DESC
@@ -300,7 +310,7 @@ class Database:
             params: tuple[Any, ...] = (source_kind, limit)
         else:
             sql = """
-                SELECT id, source_kind, source_uid, title, url, published_at, raw_payload, seen, created_at
+                SELECT id, source_kind, source_uid, title, url, published_at, raw_payload, seen, sentiment, created_at
                 FROM feed_items
                 ORDER BY published_at DESC
                 LIMIT ?
@@ -310,6 +320,34 @@ class Database:
         rows = await cursor.fetchall()
         await cursor.close()
         return [FeedItem.from_row(row) for row in rows]
+
+    async def get_unanalyzed_items(self, limit: int = 50) -> list[FeedItem]:
+        """Get items without sentiment analysis."""
+        conn = self.connection
+        cursor = await conn.execute(
+            "SELECT * FROM feed_items WHERE sentiment IS NULL ORDER BY created_at DESC LIMIT ?",
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+        await cursor.close()
+        return [FeedItem.from_row(row) for row in rows]
+
+    async def set_sentiment(self, item_id: int, sentiment: str) -> None:
+        conn = self.connection
+        await conn.execute(
+            "UPDATE feed_items SET sentiment = ? WHERE id = ?",
+            (sentiment, item_id),
+        )
+        await conn.commit()
+
+    async def set_sentiments_bulk(self, sentiments: dict[int, str]) -> None:
+        conn = self.connection
+        for item_id, sentiment in sentiments.items():
+            await conn.execute(
+                "UPDATE feed_items SET sentiment = ? WHERE id = ?",
+                (sentiment, item_id),
+            )
+        await conn.commit()
 
     async def mark_seen(self, item_id: int, seen: bool = True) -> None:
         conn = self.connection

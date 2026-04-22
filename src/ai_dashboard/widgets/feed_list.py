@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from datetime import datetime, timezone
+from importlib import import_module
 
 from textual.message import Message
 from textual.widgets import DataTable
@@ -38,6 +39,13 @@ class FeedListWidget(DataTable[str]):
             super().__init__()
             self.item = item
 
+    class ToggleRead(Message):
+        item: FeedItem
+
+        def __init__(self, item: FeedItem) -> None:
+            super().__init__()
+            self.item = item
+
     def __init__(
         self,
         strategy: FeedListStrategy,
@@ -58,10 +66,10 @@ class FeedListWidget(DataTable[str]):
         self.add_column("Title", key="title")
         self.add_column("Age", key="age")
 
-    async def refresh_items(self) -> None:
+    async def refresh_items(self, *, hide_read: bool = False) -> None:
         now = datetime.now(timezone.utc)
         items = await self.strategy.items(self.db, now)
-        self._items = list(items)
+        self._items = [item for item in items if not (hide_read and item.seen)]
         trajectories: dict[str, str] = {}
         if self._items:
             await self.db.record_rankings(self._items)
@@ -71,11 +79,17 @@ class FeedListWidget(DataTable[str]):
             self.add_row(
                 self._source_tag(item.source_kind),
                 trajectories.get(item.source_uid, "🆕"),
-                self._truncate(item.title),
+                self._truncate(self._display_title(item)),
                 self._relative(item.published_at, now),
             )
         if self._items:
             self.move_cursor(row=0, column=0)
+
+    def _display_title(self, item: FeedItem) -> str:
+        prefix = "✓ " if item.seen else ""
+        sentiment_module = import_module("ai_dashboard.sentiment")
+        indicator = sentiment_module.SENTIMENT_INDICATORS.get(item.sentiment, " ")
+        return f"{prefix}{indicator} {item.title}"
 
     def _relative(self, dt: datetime, now: datetime) -> str:
         delta = now - dt
@@ -117,3 +131,8 @@ class FeedListWidget(DataTable[str]):
             self._current_item = self._items[event.cursor_row]
             self._highlight_time = now
             self.post_message(self.ItemSelected(self._current_item))
+
+    def action_toggle_read(self) -> None:
+        row_idx = self.cursor_row
+        if 0 <= row_idx < len(self._items):
+            self.post_message(self.ToggleRead(self._items[row_idx]))

@@ -16,6 +16,7 @@ class FeedItem:
     published_at: datetime
     raw_payload: dict[str, Any] = field(default_factory=dict)
     seen: bool = False
+    sentiment: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
     def to_row(self) -> tuple[str, str, str, str, str, str, int, str]:
@@ -44,6 +45,7 @@ class FeedItem:
                 if row["raw_payload"]
                 else {},
                 seen=bool(row["seen"]),
+                sentiment=row["sentiment"] if "sentiment" in row.keys() else None,
                 created_at=_parse_iso(row["created_at"]),
             )
         except KeyError as exc:

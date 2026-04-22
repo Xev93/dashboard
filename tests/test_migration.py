@@ -89,22 +89,27 @@ def _make_item(source_uid: str, title: str = "Item") -> FeedItem:
 
 
 @pytest.mark.asyncio
-async def test_fresh_db_creates_v3_schema(tmp_path: Path) -> None:
+async def test_fresh_db_creates_v4_schema(tmp_path: Path) -> None:
     db = Database(tmp_path / "test.db")
     await db.connect()
     try:
         await db.init_schema()
 
-        assert await _schema_version(db) == 3
+        assert await _schema_version(db) == 4
         assert await _table_exists(db, "user_search_history") is True
         assert await _table_exists(db, "item_view_log") is True
         assert await _table_exists(db, "rank_history") is True
+
+        cursor = await db.connection.execute("PRAGMA table_info(feed_items)")
+        columns = await cursor.fetchall()
+        await cursor.close()
+        assert any(column[1] == "sentiment" for column in columns)
     finally:
         await db.close()
 
 
 @pytest.mark.asyncio
-async def test_v1_db_migrates_to_v3(tmp_path: Path) -> None:
+async def test_v1_db_migrates_to_v4(tmp_path: Path) -> None:
     db = Database(tmp_path / "test.db")
     await db.connect()
     try:
@@ -138,13 +143,13 @@ async def test_v1_db_migrates_to_v3(tmp_path: Path) -> None:
 
         await db.init_schema()
 
-        assert await _schema_version(db) == 3
+        assert await _schema_version(db) == 4
         assert await _table_exists(db, "user_search_history") is True
         assert await _table_exists(db, "item_view_log") is True
         assert await _table_exists(db, "rank_history") is True
 
         cursor = await db.connection.execute(
-            "SELECT title FROM feed_items WHERE source_kind = ? AND source_uid = ?",
+            "SELECT title, sentiment FROM feed_items WHERE source_kind = ? AND source_uid = ?",
             ("arxiv", "paper-1"),
         )
         feed_row = await cursor.fetchone()
@@ -159,6 +164,7 @@ async def test_v1_db_migrates_to_v3(tmp_path: Path) -> None:
 
         assert feed_row is not None
         assert feed_row["title"] == "Original title"
+        assert feed_row["sentiment"] is None
         assert state_row is not None
         assert state_row["value"] == "transformers"
     finally:
@@ -166,14 +172,14 @@ async def test_v1_db_migrates_to_v3(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_v3_db_no_double_migration(tmp_path: Path) -> None:
+async def test_v4_db_no_double_migration(tmp_path: Path) -> None:
     db = Database(tmp_path / "test.db")
     await db.connect()
     try:
         await db.init_schema()
         await db.init_schema()
 
-        assert await _schema_version(db) == 3
+        assert await _schema_version(db) == 4
 
         cursor = await db.connection.execute("SELECT COUNT(*) FROM schema_version")
         row = await cursor.fetchone()
