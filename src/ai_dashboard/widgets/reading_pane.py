@@ -20,9 +20,15 @@ class ReadingPane(Markdown):
         super().__init__("*No item selected.*", id=id)
         self._item: FeedItem | None = None
         self._fetcher = content_fetcher
+        self._current_content: str | None = None
+
+    @property
+    def current_content(self) -> str | None:
+        return self._current_content
 
     async def show_item(self, item: FeedItem | None) -> None:
         self._item = item
+        self._current_content = None
         if item is None:
             await self.update("*No item selected.*")
             return
@@ -41,10 +47,19 @@ class ReadingPane(Markdown):
         content = await self._fetcher.fetch_content(item)
         if self._item != item:
             return
+        self._current_content = self._prepare_content(content, item.source_kind)
         markdown = self._render_metadata(item)
         markdown += "\n\n---\n\n"
-        markdown += self._prepare_content(content, item.source_kind)
+        markdown += self._current_content
         await self.update(markdown)
+
+    async def show_summary(self, summary: str) -> None:
+        """Prepend AI summary above the current content."""
+        separator = "\n\n---\n\n"
+        header = "## 🤖 AI Summary\n\n"
+        current = self._current_content or ""
+        combined = f"{header}{summary}{separator}{current}"
+        await self.update(combined)
 
     def _render_metadata(self, item: FeedItem) -> str:
         kind = item.source_kind
