@@ -11,7 +11,7 @@ from ai_dashboard.source_catalog import ENGAGEMENT_KEYS as _ENGAGEMENT_KEYS
 from ai_dashboard.storage.models import FeedItem, _parse_iso
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MIN_SAMPLE_SIZE = 20
 
 
@@ -74,6 +74,20 @@ CREATE INDEX IF NOT EXISTS idx_view_log_action ON item_view_log(action, logged_a
 CREATE INDEX IF NOT EXISTS idx_view_log_source ON item_view_log(source_kind, logged_at);
 
 UPDATE schema_version SET version = 2;
+"""
+
+
+SCHEMA_V3_SQL = """
+CREATE TABLE IF NOT EXISTS rank_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source_kind TEXT NOT NULL,
+    source_uid TEXT NOT NULL,
+    rank INTEGER NOT NULL,
+    polled_at REAL NOT NULL DEFAULT (unixepoch('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_rank_history_item ON rank_history(source_kind, source_uid, polled_at DESC);
+
+UPDATE schema_version SET version = 3;
 """
 
 
@@ -140,6 +154,9 @@ class Database:
         version = row["version"] if row else 1
         if version < 2:
             await conn.executescript(SCHEMA_V2_SQL)
+            version = 2
+        if version < 3:
+            await conn.executescript(SCHEMA_V3_SQL)
         await self._clean_newsletter_hash_migration(conn)
         await conn.commit()
         await self.evict_stale_cache()
@@ -203,6 +220,70 @@ class Database:
                 await update_cursor.close()
         await conn.commit()
         return new_count
+
+    async def record_rankings(self, items: list[FeedItem]) -> None:
+        """Record current rank position for each item."""
+        if not items:
+            return
+        conn = self.connection
+        polled_at = datetime.now(timezone.utc).timestamp()
+        for rank, item in enumerate(items, 1):
+            await conn.execute(
+                "INSERT INTO rank_history (source_kind, source_uid, rank, polled_at) VALUES (?, ?, ?, ?)",
+                (item.source_kind, item.source_uid, rank, polled_at),
+            )
+        await conn.commit()
+        await self._prune_rank_history()
+
+    async def get_rank_trajectory(
+        self, source_kind: str, source_uid: str, lookback: int = 3
+    ) -> str:
+        """Get trajectory indicator based on rank changes over last N polls.
+
+        Returns: ▲ (rising/improving rank), ▼ (falling), ━ (stable), 🆕 (only 1 data point)
+        """
+        conn = self.connection
+        cursor = await conn.execute(
+            """SELECT rank FROM rank_history
+               WHERE source_kind = ? AND source_uid = ?
+               ORDER BY polled_at DESC LIMIT ?""",
+            (source_kind, source_uid, lookback),
+        )
+        rows = list(await cursor.fetchall())
+        await cursor.close()
+        if len(rows) <= 1:
+            return "🆕"
+
+        latest_rank = rows[0]["rank"]
+        oldest_rank = rows[-1]["rank"]
+        if latest_rank < oldest_rank:
+            return "▲"
+        if latest_rank > oldest_rank:
+            return "▼"
+        return "━"
+
+    async def get_bulk_trajectories(
+        self, items: list[FeedItem], lookback: int = 3
+    ) -> dict[str, str]:
+        """Get trajectories for multiple items at once."""
+        result: dict[str, str] = {}
+        for item in items:
+            result[item.source_uid] = await self.get_rank_trajectory(
+                item.source_kind, item.source_uid, lookback
+            )
+        return result
+
+    async def _prune_rank_history(self, keep_polls: int = 10) -> None:
+        conn = self.connection
+        await conn.execute(
+            """DELETE FROM rank_history WHERE polled_at < (
+                SELECT MIN(polled_at) FROM (
+                    SELECT DISTINCT polled_at FROM rank_history ORDER BY polled_at DESC LIMIT ?
+                )
+            )""",
+            (keep_polls,),
+        )
+        await conn.commit()
 
     async def get_items(
         self, limit: int = 500, source_kind: str | None = None
@@ -364,6 +445,51 @@ class Database:
             ON CONFLICT(key) DO UPDATE SET value = excluded.value
             """,
             (key, value),
+        )
+        await conn.commit()
+
+    async def get_last_poll_time(self) -> datetime | None:
+        """Get the second-most-recent poll completion time."""
+        previous_cursor = await self.connection.execute(
+            "SELECT value FROM user_state WHERE key = 'previous_poll_completed'"
+        )
+        previous_row = await previous_cursor.fetchone()
+        await previous_cursor.close()
+        if previous_row:
+            return _parse_iso(previous_row["value"])
+
+        current_cursor = await self.connection.execute(
+            "SELECT value FROM user_state WHERE key = 'last_poll_completed'"
+        )
+        current_row = await current_cursor.fetchone()
+        await current_cursor.close()
+        if current_row:
+            return _parse_iso(current_row["value"])
+        return None
+
+    async def set_last_poll_time(self, dt: datetime) -> None:
+        conn = self.connection
+        current_cursor = await conn.execute(
+            "SELECT value FROM user_state WHERE key = 'last_poll_completed'"
+        )
+        current_row = await current_cursor.fetchone()
+        await current_cursor.close()
+
+        if current_row:
+            await conn.execute(
+                """
+                INSERT INTO user_state(key, value) VALUES('previous_poll_completed', ?)
+                ON CONFLICT(key) DO UPDATE SET value = excluded.value
+                """,
+                (current_row["value"],),
+            )
+
+        await conn.execute(
+            """
+            INSERT INTO user_state(key, value) VALUES('last_poll_completed', ?)
+            ON CONFLICT(key) DO UPDATE SET value = excluded.value
+            """,
+            (dt.isoformat(),),
         )
         await conn.commit()
 

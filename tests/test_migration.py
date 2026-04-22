@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import sqlite3
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
 from ai_dashboard.storage.db import Database
+from ai_dashboard.storage.models import FeedItem
 
 
 V1_SCHEMA_SQL = """
@@ -74,22 +76,35 @@ async def _insert_view_log(
     await db.connection.commit()
 
 
+def _make_item(source_uid: str, title: str = "Item") -> FeedItem:
+    return FeedItem(
+        id=None,
+        source_kind="hn",
+        source_uid=source_uid,
+        title=title,
+        url=f"https://example.com/{source_uid}",
+        published_at=datetime(2026, 4, 12, tzinfo=timezone.utc),
+        raw_payload={},
+    )
+
+
 @pytest.mark.asyncio
-async def test_fresh_db_creates_v2_schema(tmp_path: Path) -> None:
+async def test_fresh_db_creates_v3_schema(tmp_path: Path) -> None:
     db = Database(tmp_path / "test.db")
     await db.connect()
     try:
         await db.init_schema()
 
-        assert await _schema_version(db) == 2
+        assert await _schema_version(db) == 3
         assert await _table_exists(db, "user_search_history") is True
         assert await _table_exists(db, "item_view_log") is True
+        assert await _table_exists(db, "rank_history") is True
     finally:
         await db.close()
 
 
 @pytest.mark.asyncio
-async def test_v1_db_migrates_to_v2(tmp_path: Path) -> None:
+async def test_v1_db_migrates_to_v3(tmp_path: Path) -> None:
     db = Database(tmp_path / "test.db")
     await db.connect()
     try:
@@ -123,9 +138,10 @@ async def test_v1_db_migrates_to_v2(tmp_path: Path) -> None:
 
         await db.init_schema()
 
-        assert await _schema_version(db) == 2
+        assert await _schema_version(db) == 3
         assert await _table_exists(db, "user_search_history") is True
         assert await _table_exists(db, "item_view_log") is True
+        assert await _table_exists(db, "rank_history") is True
 
         cursor = await db.connection.execute(
             "SELECT title FROM feed_items WHERE source_kind = ? AND source_uid = ?",
@@ -150,14 +166,14 @@ async def test_v1_db_migrates_to_v2(tmp_path: Path) -> None:
 
 
 @pytest.mark.asyncio
-async def test_v2_db_no_double_migration(tmp_path: Path) -> None:
+async def test_v3_db_no_double_migration(tmp_path: Path) -> None:
     db = Database(tmp_path / "test.db")
     await db.connect()
     try:
         await db.init_schema()
         await db.init_schema()
 
-        assert await _schema_version(db) == 2
+        assert await _schema_version(db) == 3
 
         cursor = await db.connection.execute("SELECT COUNT(*) FROM schema_version")
         row = await cursor.fetchone()
@@ -165,6 +181,58 @@ async def test_v2_db_no_double_migration(tmp_path: Path) -> None:
 
         assert row is not None
         assert row[0] == 1
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_record_rankings_and_get_trajectory(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    await db.connect()
+    try:
+        await db.init_schema()
+
+        alpha = _make_item("alpha", "Alpha")
+        beta = _make_item("beta", "Beta")
+
+        await db.record_rankings([alpha, beta])
+        assert await db.get_rank_trajectory("hn", "alpha") == "🆕"
+
+        await db.record_rankings([beta, alpha])
+
+        assert await db.get_rank_trajectory("hn", "alpha") == "▼"
+        assert await db.get_rank_trajectory("hn", "beta") == "▲"
+        assert await db.get_bulk_trajectories([alpha, beta]) == {
+            "alpha": "▼",
+            "beta": "▲",
+        }
+    finally:
+        await db.close()
+
+
+@pytest.mark.asyncio
+async def test_record_rankings_prunes_old_polls(tmp_path: Path) -> None:
+    db = Database(tmp_path / "test.db")
+    await db.connect()
+    try:
+        await db.init_schema()
+        item = _make_item("alpha", "Alpha")
+
+        for _ in range(12):
+            await db.record_rankings([item])
+            _ = await db.connection.execute(
+                "UPDATE rank_history SET polled_at = polled_at + 1 WHERE id = last_insert_rowid()"
+            )
+            await db.connection.commit()
+
+        cursor = await db.connection.execute(
+            "SELECT COUNT(DISTINCT polled_at) AS polls FROM rank_history"
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+
+        assert row is not None
+        assert row["polls"] == 10
     finally:
         await db.close()
 

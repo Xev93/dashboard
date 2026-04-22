@@ -54,6 +54,7 @@ class FeedListWidget(DataTable[str]):
 
     def on_mount(self) -> None:
         self.add_column("S", key="source")
+        self.add_column("↕", key="trajectory", width=2)
         self.add_column("Title", key="title")
         self.add_column("Age", key="age")
 
@@ -61,10 +62,15 @@ class FeedListWidget(DataTable[str]):
         now = datetime.now(timezone.utc)
         items = await self.strategy.items(self.db, now)
         self._items = list(items)
+        trajectories: dict[str, str] = {}
+        if self._items:
+            await self.db.record_rankings(self._items)
+            trajectories = await self.db.get_bulk_trajectories(self._items)
         self.clear()
         for item in self._items:
             self.add_row(
                 self._source_tag(item.source_kind),
+                trajectories.get(item.source_uid, "🆕"),
                 self._truncate(item.title),
                 self._relative(item.published_at, now),
             )

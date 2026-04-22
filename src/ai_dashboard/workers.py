@@ -67,8 +67,8 @@ class PollingOrchestrator:
             try:
                 items = await adapter.fetch()
                 new_count = await self.db.upsert_items(items)
-                if new_count > 0:
-                    await self.on_new_items(new_count, adapter.kind)
+                await self.db.set_last_poll_time(datetime.now(timezone.utc))
+                await self.on_new_items(new_count, adapter.kind)
                 await self.db.update_source_state(
                     adapter.kind,
                     last_fetched=datetime.now(timezone.utc),
