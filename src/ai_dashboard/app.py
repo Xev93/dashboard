@@ -4,12 +4,15 @@ import logging
 import os
 import webbrowser
 from datetime import datetime, timezone
+from importlib import import_module
+from pathlib import Path
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal
 from textual.message import Message
 
+from .ai_service import AIService
 from .config import AppConfig
 from .content import ContentFetcher
 from .daemon import PID_PATH
@@ -26,6 +29,10 @@ from .widgets.source_tabs import SourceTabs
 from .workers import PollingOrchestrator
 
 logger = logging.getLogger(__name__)
+
+DEFAULT_INTERESTS = """AI research, machine learning, large language models, neural architectures,
+reinforcement learning, computer vision, natural language processing
+"""
 
 
 class ItemsArrived(Message):
@@ -46,7 +53,9 @@ class AIDashboardApp(App[None]):
 
     BINDINGS = [
         ("q", "quit", "Quit"),
-        ("r", "refresh_all", "Refresh"),
+        ("ctrl+r", "refresh_all", "Refresh"),
+        ("r", "toggle_read", "Read/Unread"),
+        ("R", "hide_read", "Hide Read"),
         ("o", "open_url", "Open URL"),
         ("space", "toggle_seen", "Toggle seen"),
         *[Binding(str(i), f"select_tab({i})", show=False) for i in range(1, 14)],
@@ -57,7 +66,9 @@ class AIDashboardApp(App[None]):
         Binding("home", "scroll_reading_home", "Top", priority=True),
         Binding("end", "scroll_reading_end", "Bottom", priority=True),
         ("/", "open_filter", "Filter"),
-        ("s", "cycle_strategy", "Ranked/Chrono"),
+        ("s", "summarize", "AI Summary"),
+        ("S", "cycle_strategy", "Ranked/Chrono"),
+        ("i", "toggle_interest_filter", "Interest AI"),
     ]
 
     def __init__(self, config: AppConfig) -> None:
@@ -65,7 +76,13 @@ class AIDashboardApp(App[None]):
         self.config = config
         self.db = Database(config.db_path)
         self.content_fetcher = ContentFetcher(self.db)
+        self._ai_service = AIService.from_config(config)
         self._ranked_mode: bool = False
+        self._interest_mode: bool = False
+        self._hide_read: bool = False
+        self._filter_text: str = ""
+        self._interests_path = self._default_interests_path()
+        self._ensure_interests_file()
         self._base_strategy: FeedListStrategy = self._default_strategy()
         self._active_strategy: FeedListStrategy = self._base_strategy
         self.strategy: FeedListStrategy = self._active_strategy
@@ -86,7 +103,9 @@ class AIDashboardApp(App[None]):
     async def on_mount(self) -> None:
         await self.content_fetcher.start()
         feed_list = self.query_one(FeedListWidget)
-        await feed_list.refresh_items()
+        await feed_list.refresh_items(hide_read=self._hide_read)
+        if self._ai_service.is_enabled:
+            self.run_worker(self._analyze_new_sentiments())
 
         if self._is_daemon_running():
             self.orchestrator = None
@@ -134,12 +153,24 @@ class AIDashboardApp(App[None]):
 
     async def on_items_arrived(self, message: ItemsArrived) -> None:
         feed_list = self.query_one(FeedListWidget)
-        await feed_list.refresh_items()
+        await feed_list.refresh_items(hide_read=self._hide_read)
+        if self._ai_service.is_enabled:
+            self.run_worker(self._analyze_new_sentiments())
 
     async def _periodic_refresh(self) -> None:
         """When daemon is polling, periodically refresh feed from DB."""
         feed_list = self.query_one(FeedListWidget)
-        await feed_list.refresh_items()
+        await feed_list.refresh_items(hide_read=self._hide_read)
+        if self._ai_service.is_enabled:
+            self.run_worker(self._analyze_new_sentiments())
+
+    async def _analyze_new_sentiments(self) -> None:
+        sentiment_module = import_module("ai_dashboard.sentiment")
+        analyze_sentiments = sentiment_module.analyze_sentiments
+        count = await analyze_sentiments(self._ai_service, self.db)
+        if count > 0:
+            feed_list = self.query_one(FeedListWidget)
+            await feed_list.refresh_items(hide_read=self._hide_read)
 
     async def on_feed_list_widget_item_selected(
         self, message: FeedListWidget.ItemSelected
@@ -161,21 +192,30 @@ class AIDashboardApp(App[None]):
             message.item.source_kind, message.item.source_uid, "skipped"
         )
 
+    async def on_feed_list_widget_toggle_read(
+        self, message: FeedListWidget.ToggleRead
+    ) -> None:
+        item = message.item
+        new_seen = 0 if item.seen else 1
+        if item.id is None:
+            return
+        await self.db.mark_seen(item.id, seen=bool(new_seen))
+        feed_list = self.query_one(FeedListWidget)
+        await feed_list.refresh_items(hide_read=self._hide_read)
+
     async def on_source_tabs_tab_changed(self, message: SourceTabs.TabChanged) -> None:
         if message.source_kind is None:
             self._base_strategy = self._default_strategy()
         else:
             self._base_strategy = BySourceStrategy(message.source_kind)
-        self._active_strategy = self._base_strategy
+        self._rebuild_active_strategy()
         await self._apply_strategy()
 
     async def on_filter_bar_filter_changed(
         self, message: FilterBar.FilterChanged
     ) -> None:
-        if message.text:
-            self._active_strategy = FilteredStrategy(self._base_strategy, message.text)
-        else:
-            self._active_strategy = self._base_strategy
+        self._filter_text = message.text.strip()
+        self._rebuild_active_strategy()
         await self._apply_strategy()
 
     async def on_filter_bar_filter_closed(
@@ -185,7 +225,8 @@ class AIDashboardApp(App[None]):
         final_text = self.query_one("#filter-bar", FilterBar).value.strip()
         if final_text and len(final_text) >= 3:
             await self.db.record_search_term(final_text)
-        self._active_strategy = self._base_strategy
+        self._filter_text = ""
+        self._rebuild_active_strategy()
         self.query_one("#filter-bar", FilterBar).display = False
         await self._apply_strategy()
 
@@ -220,6 +261,13 @@ class AIDashboardApp(App[None]):
         if item.id is not None:
             self.run_worker(self._toggle_seen_worker(item.id))
 
+    def action_toggle_read(self) -> None:
+        self.query_one(FeedListWidget).action_toggle_read()
+
+    def action_hide_read(self) -> None:
+        self._hide_read = not self._hide_read
+        self.run_worker(self._refresh_feed_list())
+
     def action_open_filter(self) -> None:
         bar = self.query_one("#filter-bar", FilterBar)
         bar.display = True
@@ -228,7 +276,44 @@ class AIDashboardApp(App[None]):
     def action_cycle_strategy(self) -> None:
         self._ranked_mode = not self._ranked_mode
         self._base_strategy = self._default_strategy()
-        self._active_strategy = self._base_strategy
+        self._rebuild_active_strategy()
+        self.run_worker(self._apply_strategy())
+
+    async def action_summarize(self) -> None:
+        """Generate AI summary of the current article."""
+        if not self._ai_service.is_enabled:
+            self.notify(
+                "AI not configured. Add [ai] section to config.toml",
+                severity="warning",
+            )
+            return
+
+        reading_pane = self.query_one(ReadingPane)
+        current_content = reading_pane.current_content
+        if not current_content or current_content.startswith("["):
+            self.notify("No article content to summarize", severity="warning")
+            return
+
+        self.notify("Generating summary...")
+        content_for_summary = current_content[:8000]
+        summary = await self._ai_service.complete(
+            system_prompt=(
+                "You are a concise research summarizer. Summarize the key findings, "
+                "methodology, and implications in 3-5 bullet points. Be specific "
+                "and technical. Use markdown formatting."
+            ),
+            user_prompt=f"Summarize this article:\n\n{content_for_summary}",
+        )
+
+        if summary:
+            await reading_pane.show_summary(summary)
+            return
+
+        self.notify("Summary generation failed", severity="error")
+
+    def action_toggle_interest_filter(self) -> None:
+        self._interest_mode = not self._interest_mode
+        self._rebuild_active_strategy()
         self.run_worker(self._apply_strategy())
 
     async def _toggle_seen_worker(self, item_id: int) -> None:
@@ -240,11 +325,42 @@ class AIDashboardApp(App[None]):
             return HeuristicRankingStrategy(self.config.ranking)
         return ChronologicalAllSourcesStrategy(limit=500)
 
+    def _rebuild_active_strategy(self) -> None:
+        strategy = self._base_strategy
+        if self._interest_mode:
+            interest_module = import_module("ai_dashboard.strategies.interest")
+            interest_filter_strategy = interest_module.InterestFilterStrategy
+            strategy = interest_filter_strategy(
+                self._ai_service,
+                self._read_interests_text(),
+                strategy,
+            )
+        if self._filter_text:
+            strategy = FilteredStrategy(strategy, self._filter_text)
+        self._active_strategy = strategy
+
+    def _default_interests_path(self) -> Path:
+        xdg = os.environ.get("XDG_CONFIG_HOME")
+        root = Path(xdg) if xdg else Path.home() / ".config"
+        return root / "ai-dashboard" / "interests.txt"
+
+    def _ensure_interests_file(self) -> None:
+        self._interests_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self._interests_path.exists():
+            self._interests_path.write_text(DEFAULT_INTERESTS, encoding="utf-8")
+
+    def _read_interests_text(self) -> str:
+        self._ensure_interests_file()
+        return self._interests_path.read_text(encoding="utf-8").strip()
+
     async def _apply_strategy(self) -> None:
         feed_list = self.query_one(FeedListWidget)
         self.strategy = self._active_strategy
         feed_list.strategy = self._active_strategy
-        await feed_list.refresh_items()
+        await feed_list.refresh_items(hide_read=self._hide_read)
+
+    async def _refresh_feed_list(self) -> None:
+        await self.query_one(FeedListWidget).refresh_items(hide_read=self._hide_read)
 
     def action_scroll_reading_up(self) -> None:
         pane = self.query_one("#reading-pane")
