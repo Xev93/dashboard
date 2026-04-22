@@ -9,7 +9,7 @@ authors = [
     { name = "AI Dashboard Contributors" },
 ]
 dependencies = [
-    "textual>=0.60",
+    "textual>=8.2.3",
     "httpx>=0.27",
     "feedparser>=6.0.10",
     "selectolax>=0.3.20",
